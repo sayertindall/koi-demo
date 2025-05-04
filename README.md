@@ -10,52 +10,52 @@ KOI-net is a self-forming knowledge mesh that connects specialized nodes to crea
 
 KOI-net is organized around the following components:
 
-### 1. Coordinator Node
+### 1. Coordinator Node (`nodes/koi-net-coordinator-node`)
 
 The central hub for node discovery and connection management:
 
-- Facilitates node discovery and edge formation
-- Maintains the network topology
-- Serves as the initial contact point for all nodes
+- Facilitates node discovery and edge formation.
+- Maintains the network topology.
+- Serves as the initial contact point for all nodes.
 
 ### 2. Sensor Nodes
 
 Specialized nodes that connect to external data sources:
 
-- **GitHub Sensor** (`koi-net-github-sensor-node`):
+- **GitHub Sensor** (`nodes/koi-net-github-sensor-node`):
 
-  - Monitors GitHub repositories for new commits
-  - Extracts relevant metadata and content
-  - Publishes commit information to the network
+  - Monitors GitHub repositories for new commits.
+  - Extracts relevant metadata and content.
+  - Publishes commit information (`GithubCommit` RIDs) to the network.
 
-- **HackMD Sensor** (`koi-net-hackmd-sensor-node`):
-  - Tracks changes to HackMD notes
-  - Captures note metadata and content
-  - Makes notes discoverable in the knowledge mesh
+- **HackMD Sensor** (`nodes/koi-net-hackmd-sensor-node`):
+  - Tracks changes to specified HackMD notes or teams.
+  - Captures note metadata and content.
+  - Publishes note information (`HackMDNote` RIDs) to the network.
 
 ### 3. Processor Nodes
 
 Nodes that transform, index, and expose knowledge:
 
-- **Processor A - GitHub Repository Indexer** (`koi-net-processor-a-node`):
+- **Processor A - GitHub Repository Indexer** (`nodes/koi-net-processor-a-node`):
 
-  - Consumes GitHub commit events
-  - Builds a searchable index of repository information
-  - Provides a search API for querying commit data
+  - Consumes `GithubCommit` events from the GitHub Sensor.
+  - Builds a searchable index of repository commit information.
+  - Provides a search API (`/search`) for querying commit data by SHA or keyword.
 
-- **Processor B - HackMD Note Indexer** (`koi-net-processor-b-node`):
-  - Processes HackMD note events
-  - Creates a multi-faceted index of notes
-  - Exposes an API for searching and discovering notes
+- **Processor B - HackMD Note Indexer** (`nodes/koi-net-processor-b-node`):
+  - Consumes `HackMDNote` events from the HackMD Sensor.
+  - Creates a searchable index based on note titles, tags, and IDs.
+  - Exposes a search API (`/search`) for discovering notes by tag, title word, or note ID.
 
 ## KOI Protocol
 
 The system leverages the KOI protocol, which provides:
 
-- **Resource Identifiers (RIDs)**: Unique identifiers for all system resources
-- **Manifest/Bundle Model**: Efficient metadata and content exchange
-- **Edge System**: Self-forming connections between nodes
-- **Event Propagation**: Real-time updates across the mesh
+- **Resource Identifiers (RIDs)**: Unique identifiers for all system resources (e.g., `GithubCommit`, `HackMDNote`). Uses `rid-lib`.
+- **Manifest/Bundle Model**: Efficient metadata and content exchange.
+- **Edge System**: Self-forming connections between nodes managed via the Coordinator.
+- **Event Propagation**: Real-time updates across the mesh.
 
 ## Getting Started
 
@@ -63,52 +63,76 @@ The system leverages the KOI protocol, which provides:
 
 - Docker and Docker Compose
 - Python 3.12+
-- Access to GitHub and/or HackMD instances
+- `uv` (Python package manager, install via `pip install uv`)
+- Access tokens/secrets for GitHub and HackMD.
 
 ### Configuration
 
-1. Copy sample configuration files:
+1.  **Set up Environment Secrets:**
 
-   ```
-   cp -r config/sample/* config/local/
-   cp -r config/sample/* config/docker/
-   ```
+    - Copy the example environment file: `cp config/docker/global.env.example config/docker/global.env`
+    - Edit `config/docker/global.env` and add your actual secrets:
+      - `GITHUB_TOKEN`: Your GitHub Personal Access Token.
+      - `HACKMD_TOKEN`: Your HackMD API Token.
+      - `GITHUB_WEBHOOK_SECRET`: A secret string for verifying GitHub webhooks (if using webhook mode).
 
-2. Modify configuration files in `config/local/` and `config/docker/` according to your environment.
+2.  **Review Node Configurations:**
+    - Examine the YAML files in `config/docker/` (e.g., `github-sensor.yaml`, `hackmd-sensor.yaml`, `processor-a.yaml`, `processor-b.yaml`).
+    - Adjust settings like monitored GitHub repos (`repos` list in `github-sensor.yaml`) or target HackMD notes/team (`target_note_ids` / `team_path` in `hackmd-sensor.yaml`) as needed.
+    - **Note:** For local development, use the configurations in `config/local/` and adjust paths/URLs accordingly.
 
-3. Set up environment variables in `.env` file:
-   ```
-   GITHUB_TOKEN=your_github_token
-   HACKMD_API_KEY=your_hackmd_api_key
-   ```
+### Installation (Local Development)
 
-### Running with Docker
+1.  **Create Virtual Environment:**
+
+    ```bash
+    uv venv
+    source .venv/bin/activate
+    ```
+
+2.  **Install All Packages:**
+    - Use the Makefile for convenience:
+      ```bash
+      make install
+      ```
+    - _Alternatively, install manually:_ Install the root package and then each node package individually using `uv pip install -e .` in the respective directories (root, `nodes/*`, `rid_types`).
+
+### Running with Docker (Recommended)
 
 Launch the entire system using Docker Compose:
 
+```bash
+docker compose up --build -d
 ```
-docker-compose up
-```
 
-This will start all nodes in the correct order with appropriate networking.
+This command will:
 
-### Running Locally
+- Build images for all nodes.
+- Start containers in the correct dependency order.
+- Run services in the background (`-d`).
 
-For development, you can run individual nodes locally:
+Use `docker compose logs -f` to view aggregated logs or `docker compose logs -f <service_name>` (e.g., `processor-a`) for specific logs.
 
-1. Install dependencies for a specific node:
+Stop the system with `docker compose down`.
 
-   ```
-   cd nodes/koi-net-processor-a-node
-   pip install -e .
-   ```
+### Running Locally (Development)
 
-2. Run the node:
-   ```
-   python -m processor_a_node
-   ```
+After running `make install`:
 
-Repeat for other nodes as needed.
+1.  Open separate terminal windows for each node you want to run.
+2.  Activate the virtual environment in each terminal: `source .venv/bin/activate`
+3.  Set the config mode: `export KOI_CONFIG_MODE=local`
+4.  Run each node using the Makefile targets or directly:
+
+    ```bash
+    # Example: Run coordinator
+    make coordinator
+    # Or: python -m nodes.koi-net-coordinator-node.coordinator_node
+
+    # Example: Run processor A
+    make processor-a # (Add this target to Makefile if needed)
+    # Or: python -m nodes.koi-net-processor-a-node.processor_a_node
+    ```
 
 ## Node Interconnections
 
@@ -120,10 +144,10 @@ The KOI-net system forms a directed knowledge graph:
                      └──────┬──────┘
                  ┌───────── ┼ ────────┐
                  │          │         │
-         ┌───────▼──┐  ┌────▼───┐ ┌───▼────┐
-         │  GitHub  │  │ HackMD │ │   ...  │
-         │  Sensor  │  │ Sensor │ │ Future │
-         └───────┬──┘  └────┬───┘ └───────┘
+         ┌───────▼──┐  ┌────▼───┐
+         │  GitHub  │  │ HackMD │
+         │  Sensor  │  │ Sensor │
+         └───────┬──┘  └────┬───┘
                  │          │
          ┌───────▼──┐  ┌────▼───┐
          │Processor │  │Processor│
@@ -131,26 +155,38 @@ The KOI-net system forms a directed knowledge graph:
          └──────────┘  └────────┘
 ```
 
-Each node automatically discovers and connects to relevant nodes based on the RID types they produce and consume.
+- **Coordinator** connects to all nodes.
+- **Sensors** connect to the Coordinator.
+- **Processors** connect to the Coordinator and their respective **Sensors**.
+
+Each node automatically discovers and connects to relevant peers based on the RID types they produce and consume, facilitated by the Coordinator.
 
 ## Development
 
 ### Adding a New Node
 
-1. Create a directory in `nodes/` for your new node
-2. Implement the KOI protocol interfaces
-3. Define the RID types the node provides and consumes
-4. Add appropriate configuration in `config/`
-5. Update the Docker Compose file to include the new node
+1.  Create a directory `nodes/koi-net-<your-node-name>-node/`.
+2.  Implement the node logic within a Python package (e.g., `your_node_name_node/`).
+3.  Define necessary RID types (preferably in the `rid_types` package).
+4.  Implement `core.py` (NodeInterface setup), `handlers.py`, `server.py`, `config.py`.
+5.  Create `pyproject.toml` and `Dockerfile`.
+6.  Add configuration files to `config/docker/` and `config/local/`.
+7.  Update the main `docker-compose.yaml` to include the new service.
+8.  Update `Makefile` install targets.
 
 ### Extending Existing Nodes
 
-Refer to each node's README for specific instructions on extending their capabilities:
+Refer to each node's README for specific instructions:
 
-- [Processor A - GitHub Repository Indexer](nodes/koi-net-processor-a-node/README.md)
-- [Processor B - HackMD Note Indexer](nodes/koi-net-processor-b-node/README.md)
+- [Coordinator](nodes/koi-net-coordinator-node/README.md)
+- [GitHub Sensor](nodes/koi-net-github-sensor-node/README.md)
+- [HackMD Sensor](nodes/koi-net-hackmd-sensor-node/README.md)
+- [Processor A - GitHub Indexer](nodes/koi-net-processor-a-node/README.md)
+- [Processor B - HackMD Indexer](nodes/koi-net-processor-b-node/README.md)
 
 ## Documentation
+
+_(Links to be created/verified)_
 
 - [KOI Protocol Specification](docs/koi-protocol.md)
 - [RID Library Documentation](docs/rid-lib.md)
@@ -159,4 +195,4 @@ Refer to each node's README for specific instructions on extending their capabil
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
