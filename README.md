@@ -52,10 +52,6 @@ flowchart LR
     G -- "manifests" --> A
     H -- "manifests" --> B
     A -- "derived RIDs" --> B
-
-    classDef sensor fill:#dae8fc,stroke:#6c8ebf;
-    classDef proc fill:#e1d5e7,stroke:#9673a6;
-    classDef coord fill:#d5e8d4,stroke:#82b366;
 ```
 
 ### 3.1 Service Topology
