@@ -1,4 +1,6 @@
-.PHONY: setup install clean coordinator github hackmd demo-coordinator demo-github demo-hackmd docker-clean rebuild docker-rebuild clean-cache up down
+.PHONY: setup install clean coordinator github hackmd processor-a processor-b \
+        demo-coordinator demo-github demo-hackmd docker-clean rebuild \
+        docker-rebuild clean-cache up down
 
 setup:
 	@echo "Creating virtual environment with uv..."
@@ -15,6 +17,12 @@ install:
 	uv pip install -e nodes/koi-net-github-sensor-node/
 	@echo "Installing hackmd service..."
 	uv pip install -e nodes/koi-net-hackmd-sensor-node/
+	@echo "Installing rid_types package..."
+	uv pip install -e rid_types/
+	@echo "Installing processor-a-node..."
+	uv pip install -e nodes/koi-net-processor-a-node/
+	@echo "Installing processor-b-node..."
+	uv pip install -e nodes/koi-net-processor-b-node/
 	@echo "All packages installed successfully!"
 
 clean:
@@ -44,6 +52,16 @@ hackmd:
 	@echo "Running HackMD Node..."
 	export KOI_CONFIG_MODE=local
 	.venv/bin/python3 -m nodes.koi-net-hackmd-sensor-node.hackmd_sensor_node
+
+processor-a:
+	@echo "Running Processor A Node..."
+	export KOI_CONFIG_MODE=local
+	.venv/bin/python3 -m nodes.koi-net-processor-a-node.processor_a_node
+
+processor-b:
+	@echo "Running Processor B Node..."
+	export KOI_CONFIG_MODE=local
+	.venv/bin/python3 -m nodes.koi-net-processor-b-node.processor_b_node
 
 demo-coordinator:
 	@echo "Starting Coordinator via Docker Compose..."

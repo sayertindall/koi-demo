@@ -10,18 +10,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Config Loader: Supports config/local and config/docker --- 
+# --- Config Loader: Supports config/local and config/docker ---
 CONFIG_MODE = os.environ.get("KOI_CONFIG_MODE", "local")
 if os.environ.get("RUN_CONTEXT") == "docker":
     CONFIG_BASE = Path("/config")
     if CONFIG_MODE != "docker":
-        logger.warning(f"RUN_CONTEXT=docker but KOI_CONFIG_MODE='{CONFIG_MODE}'. Forcing KOI_CONFIG_MODE to 'docker'.")
+        logger.warning(
+            f"RUN_CONTEXT=docker but KOI_CONFIG_MODE='{CONFIG_MODE}'. Forcing KOI_CONFIG_MODE to 'docker'."
+        )
         CONFIG_MODE = "docker"
 else:
     CONFIG_BASE = Path(__file__).parent.parent.parent.parent / "config"
 CONFIG_DIR = CONFIG_BASE / CONFIG_MODE
 
-CONFIG_PATH = CONFIG_DIR / "processor-b.yaml" # Specific config file
+CONFIG_PATH = CONFIG_DIR / "processor-b.yaml"  # Specific config file
 ENV_PATH = CONFIG_DIR / "global.env"
 
 logger.info(f"Attempting to load config from: {CONFIG_PATH}")
@@ -30,6 +32,7 @@ logger.info(f"Attempting to load env from: {ENV_PATH}")
 # Load env vars from the selected global.env first
 if ENV_PATH.is_file():
     from dotenv import load_dotenv
+
     load_dotenv(dotenv_path=ENV_PATH, override=True)
     logger.info(f"Loaded environment variables from {ENV_PATH}")
 else:
@@ -42,7 +45,7 @@ if CONFIG_PATH.is_file():
         yaml_loader = YAML(typ="safe")
         with open(CONFIG_PATH) as f:
             CONFIG = yaml_loader.load(f)
-        if CONFIG is None: # Handle empty file case
+        if CONFIG is None:  # Handle empty file case
             CONFIG = {}
         logger.info(f"Successfully loaded YAML config from {CONFIG_PATH}")
     except Exception as e:
@@ -52,23 +55,25 @@ else:
 
 # --- End Config Loader ---
 
-# --- Determine Run Context & Extract Settings --- 
+# --- Determine Run Context & Extract Settings ---
 is_docker = os.getenv("RUN_CONTEXT") == "docker" or CONFIG_MODE == "docker"
 
 RUNTIME_CONFIG: Dict[str, Any] = CONFIG.get("runtime", {})
 EDGES_CONFIG: Dict[str, Any] = CONFIG.get("edges", {})
-PROCESSOR_B_CONFIG: Dict[str, Any] = CONFIG.get("processor_b", {}) # Processor specific settings
+PROCESSOR_B_CONFIG: Dict[str, Any] = CONFIG.get(
+    "processor_b", {}
+)  # Processor specific settings
 
-# --- Context-Aware Configuration --- 
-LOCAL_DATA_BASE = Path("./.koi/processor-b") # Standard local path base
-DOCKER_CACHE_DIR_DEFAULT = "/data/cache" # Default for shared cache in Docker
+# --- Context-Aware Configuration ---
+LOCAL_DATA_BASE = Path("./.koi/processor-b")  # Standard local path base
+DOCKER_CACHE_DIR_DEFAULT = "/data/cache"  # Default for shared cache in Docker
 
 # Base configuration values
 HOST: str = RUNTIME_CONFIG.get("host", "127.0.0.1" if not is_docker else "0.0.0.0")
 PORT: int = RUNTIME_CONFIG.get("port", 8012)
 LOG_LEVEL: str = RUNTIME_CONFIG.get("log_level", "INFO").upper()
-BASE_URL = RUNTIME_CONFIG.get("base_url") # Should be defined in yaml
-COORDINATOR_URL = EDGES_CONFIG.get("coordinator_url") # Should be defined in yaml
+BASE_URL = RUNTIME_CONFIG.get("base_url")  # Should be defined in yaml
+COORDINATOR_URL = EDGES_CONFIG.get("coordinator_url")  # Should be defined in yaml
 
 # Optional specific sensor RID
 HACKMD_SENSOR_RID: str | None = PROCESSOR_B_CONFIG.get("hackmd_sensor_rid")
@@ -79,24 +84,26 @@ if is_docker:
 else:
     cache_dir_config = RUNTIME_CONFIG.get("cache_dir")
     if cache_dir_config:
-        CACHE_DIR = str(Path(cache_dir_config)) # Respect config if set
+        CACHE_DIR = str(Path(cache_dir_config))  # Respect config if set
     else:
         LOCAL_DATA_BASE.mkdir(parents=True, exist_ok=True)
-        CACHE_DIR = str(LOCAL_DATA_BASE / "cache") # Fallback local path
+        CACHE_DIR = str(LOCAL_DATA_BASE / "cache")  # Fallback local path
 
 # Ensure the resolved CACHE_DIR exists
 Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
 
-# --- Update Logging Level Based on Config --- 
+# --- Update Logging Level Based on Config ---
 try:
     logging.getLogger().setLevel(LOG_LEVEL.upper())
     logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
     logger.info(f"Logging level set to {LOG_LEVEL}")
 except ValueError:
-    logger.error(f"Invalid LOG_LEVEL '{LOG_LEVEL}' in configuration. Defaulting to INFO.")
+    logger.error(
+        f"Invalid LOG_LEVEL '{LOG_LEVEL}' in configuration. Defaulting to INFO."
+    )
     logging.getLogger().setLevel(logging.INFO)
 
-# --- Log Loaded Config --- 
+# --- Log Loaded Config ---
 logger.info("Processor B Configuration Loaded:")
 logger.info(f"  Config Mode: {CONFIG_MODE}")
 logger.info(f"  Is Docker Context: {is_docker}")
@@ -113,4 +120,6 @@ if not BASE_URL:
 if not COORDINATOR_URL:
     logger.critical("Configuration error: edges.coordinator_url is not set.")
 if not CACHE_DIR:
-     logger.critical("Configuration error: runtime.cache_dir is not set or resolved correctly.") 
+    logger.critical(
+        "Configuration error: runtime.cache_dir is not set or resolved correctly."
+    )

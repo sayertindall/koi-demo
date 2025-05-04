@@ -26,9 +26,11 @@ ENV_PATH = CONFIG_DIR / "global.env"
 if ENV_PATH.is_file():
     with open(ENV_PATH) as f:
         for line in f:
-            if line.strip() and not line.startswith('#') and '=' in line:
-                k, v = line.strip().split('=', 1)
-                os.environ.setdefault(k, v) # Use setdefault to avoid overriding existing env vars
+            if line.strip() and not line.startswith("#") and "=" in line:
+                k, v = line.strip().split("=", 1)
+                os.environ.setdefault(
+                    k, v
+                )  # Use setdefault to avoid overriding existing env vars
 
 # Load YAML config using ruamel.yaml
 CONFIG = {}
@@ -37,7 +39,7 @@ if CONFIG_PATH.is_file():
         yaml_loader = YAML(typ="safe")
         with open(CONFIG_PATH) as f:
             CONFIG = yaml_loader.load(f)
-        if CONFIG is None: # Handle empty file case
+        if CONFIG is None:  # Handle empty file case
             CONFIG = {}
     except Exception as e:
         logging.error(f"Error loading YAML config from {CONFIG_PATH}: {e}")
@@ -69,7 +71,7 @@ COORDINATOR_URL = EDGES_CONFIG.get("coordinator_url")
 BASE_URL = RUNTIME_CONFIG.get("base_url")
 
 # Adjust Cache and State Paths based on run context
-DOCKER_CACHE_DIR = RUNTIME_CONFIG.get("cache_dir", "/data/cache") # Default Docker path
+DOCKER_CACHE_DIR = RUNTIME_CONFIG.get("cache_dir", "/data/cache")  # Default Docker path
 DOCKER_STATE_FILE = RUNTIME_CONFIG.get(
     "state_file", os.path.join(DOCKER_CACHE_DIR, "github_state.json")
 )
@@ -79,7 +81,7 @@ if is_docker:
     STATE_FILE_PATH = (
         Path(DOCKER_STATE_FILE)
         if Path(DOCKER_STATE_FILE).is_absolute()
-        else Path("/app") / DOCKER_STATE_FILE # Assume /app if relative in Docker
+        else Path("/app") / DOCKER_STATE_FILE  # Assume /app if relative in Docker
     )
 else:
     LOCAL_DATA_BASE.mkdir(parents=True, exist_ok=True)
@@ -146,6 +148,7 @@ if not GITHUB_WEBHOOK_SECRET:
 # --- State Management (Loading initial state & update function) ---
 LAST_PROCESSED_SHA: Dict[str, str] = {}  # Dictionary mapping repo_name -> last_sha
 
+
 def load_state():
     """Loads the last processed SHA state from the JSON file specified by STATE_FILE_PATH."""
     global LAST_PROCESSED_SHA
@@ -173,6 +176,7 @@ def load_state():
         )
         LAST_PROCESSED_SHA = {}
 
+
 def update_state_file(repo_name: str, last_sha: str):
     """Updates the state file with the latest processed SHA for a repo."""
     global LAST_PROCESSED_SHA
@@ -193,6 +197,7 @@ def update_state_file(repo_name: str, last_sha: str):
             f"Unexpected error writing state file '{state_path}': {e}",
             exc_info=True,
         )
+
 
 # Load initial state when config module is imported
 load_state()

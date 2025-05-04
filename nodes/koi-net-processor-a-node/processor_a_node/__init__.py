@@ -23,7 +23,7 @@ rich_formatter = logging.Formatter(rich_format, datefmt=rich_datefmt)
 rich_handler.setFormatter(rich_formatter)
 
 # Create File Handler
-log_dir = Path(".koi/processor-a") # Adjust node name
+log_dir = Path(".koi/processor-a")  # Adjust node name
 log_dir.mkdir(parents=True, exist_ok=True)
 log_file_path = log_dir / "processor-a-node-log.txt"
 
@@ -49,4 +49,4 @@ logger.addHandler(file_handler)
 
 logger.info(
     f"Logging configured (Level: {TEMP_LOG_LEVEL}). Console via Rich, File: {log_file_path}"
-) 
+)

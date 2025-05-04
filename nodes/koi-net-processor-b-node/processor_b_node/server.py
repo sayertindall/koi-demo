@@ -21,11 +21,13 @@ from koi_net.protocol.consts import (
 )
 from koi_net.processor.knowledge_object import KnowledgeSource
 
-from .core import node # Import the initialized node instance
+from .core import node  # Import the initialized node instance
+
 # Import the query helper from handlers
 from .handlers import query_note_index
 
 logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,9 +39,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start KOI-net node: {e}", exc_info=True)
         raise RuntimeError("Failed to initialize KOI-net node") from e
-    
-    yield # Application runs here
-    
+
+    yield  # Application runs here
+
     logger.info("Shutting down Processor B...")
     try:
         node.stop()
@@ -56,14 +58,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# --- KOI Protocol Router --- 
+# --- KOI Protocol Router ---
 koi_net_router = APIRouter(prefix="/koi-net")
+
 
 @koi_net_router.post(BROADCAST_EVENTS_PATH)
 async def broadcast_events_endpoint(req: EventsPayload):
     if not req.events:
-         logger.debug("Received empty broadcast event list.")
-         return {}
+        logger.debug("Received empty broadcast event list.")
+        return {}
     logger.info(
         f"Request to {BROADCAST_EVENTS_PATH}, received {len(req.events)} event(s)"
     )
@@ -71,8 +74,11 @@ async def broadcast_events_endpoint(req: EventsPayload):
         try:
             node.processor.handle(event=event, source=KnowledgeSource.External)
         except Exception as e:
-            logger.error(f"Error handling broadcast event {event.rid}: {e}", exc_info=True)
+            logger.error(
+                f"Error handling broadcast event {event.rid}: {e}", exc_info=True
+            )
     return {}
+
 
 @koi_net_router.post(POLL_EVENTS_PATH)
 async def poll_events_endpoint(req: PollEvents) -> EventsPayload:
@@ -82,8 +88,9 @@ async def poll_events_endpoint(req: PollEvents) -> EventsPayload:
         logger.debug(f"Returning {len(events)} events for {req.rid}")
         return EventsPayload(events=events)
     except Exception as e:
-         logger.error(f"Error polling events for {req.rid}: {e}", exc_info=True)
-         return EventsPayload(events=[]) 
+        logger.error(f"Error polling events for {req.rid}: {e}", exc_info=True)
+        return EventsPayload(events=[])
+
 
 @koi_net_router.post(FETCH_RIDS_PATH)
 async def fetch_rids_endpoint(req: FetchRids) -> RidsPayload:
@@ -93,6 +100,7 @@ async def fetch_rids_endpoint(req: FetchRids) -> RidsPayload:
     except Exception as e:
         logger.error(f"Error fetching RIDs: {e}", exc_info=True)
         return RidsPayload(rids=[])
+
 
 @koi_net_router.post(FETCH_MANIFESTS_PATH)
 async def fetch_manifests_endpoint(req: FetchManifests) -> ManifestsPayload:
@@ -105,6 +113,7 @@ async def fetch_manifests_endpoint(req: FetchManifests) -> ManifestsPayload:
         logger.error(f"Error fetching Manifests: {e}", exc_info=True)
         return ManifestsPayload(manifests=[], not_found=req.rids or [])
 
+
 @koi_net_router.post(FETCH_BUNDLES_PATH)
 async def fetch_bundles_endpoint(req: FetchBundles) -> BundlesPayload:
     logger.info(f"Request to {FETCH_BUNDLES_PATH} for rids {req.rids}")
@@ -114,25 +123,28 @@ async def fetch_bundles_endpoint(req: FetchBundles) -> BundlesPayload:
         logger.error(f"Error fetching Bundles: {e}", exc_info=True)
         return BundlesPayload(bundles=[], not_found=req.rids or [])
 
+
 @koi_net_router.get("/health")
 async def health():
     """Basic health check endpoint."""
     if node and node.is_running():
-         return {"status": "healthy", "node_status": "running"}
+        return {"status": "healthy", "node_status": "running"}
     else:
-         return {"status": "unhealthy", "node_status": "stopped_or_not_initialized"}
+        return {"status": "unhealthy", "node_status": "stopped_or_not_initialized"}
+
 
 app.include_router(koi_net_router)
 
 # --- Custom Search API Router ---
 search_router = APIRouter()
 
+
 @search_router.get("/search")
 async def search_notes_endpoint(q: str):
     """Endpoint to search the indexed note data."""
     if not q:
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required.")
-        
+
     logger.info(f"Search request received: q='{q}'")
     try:
         # Use the helper function from handlers
@@ -141,8 +153,11 @@ async def search_notes_endpoint(q: str):
         return {"query": q, "results": results}
     except Exception as e:
         logger.error(f"Error during search for query '{q}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error during search.")
+        raise HTTPException(
+            status_code=500, detail="Internal server error during search."
+        )
 
-app.include_router(search_router) 
 
-logger.info("Processor B FastAPI application configured with KOI and Search routers.") 
+app.include_router(search_router)
+
+logger.info("Processor B FastAPI application configured with KOI and Search routers.")

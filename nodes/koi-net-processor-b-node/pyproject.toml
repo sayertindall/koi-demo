@@ -15,8 +15,6 @@ dependencies = [
     "koi-net==1.0.0b12", 
     "rich", 
     "ruamel.yaml",
-    # Add markdown parser if needed, e.g.:
-    # "markdown-it-py", 
 ]
 
 [tool.setuptools]

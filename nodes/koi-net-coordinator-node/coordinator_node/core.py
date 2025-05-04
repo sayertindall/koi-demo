@@ -6,7 +6,11 @@ from koi_net import NodeInterface
 from koi_net.protocol.node import NodeProfile, NodeType, NodeProvides
 
 # Import from the new config loader
-from .config_loader import BASE_URL, PORT, CACHE_DIR  # Import BASE_URL, PORT, and CACHE_DIR
+from .config_loader import (
+    BASE_URL,
+    PORT,
+    CACHE_DIR,
+)  # Import BASE_URL, PORT, and CACHE_DIR
 
 logger = logging.getLogger(__name__)  # Get logger instance
 

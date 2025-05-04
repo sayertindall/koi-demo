@@ -25,8 +25,8 @@ ENV_PATH = CONFIG_DIR / "global.env"
 if ENV_PATH.is_file():
     with open(ENV_PATH) as f:
         for line in f:
-            if line.strip() and not line.startswith('#') and '=' in line:
-                k, v = line.strip().split('=', 1)
+            if line.strip() and not line.startswith("#") and "=" in line:
+                k, v = line.strip().split("=", 1)
                 os.environ.setdefault(k, v)
 
 # Load YAML config using ruamel.yaml
@@ -36,7 +36,7 @@ if CONFIG_PATH.is_file():
         yaml_loader = YAML(typ="safe")
         with open(CONFIG_PATH) as f:
             CONFIG = yaml_loader.load(f)
-        if CONFIG is None: # Handle empty file case
+        if CONFIG is None:  # Handle empty file case
             CONFIG = {}
     except Exception as e:
         logging.error(f"Error loading YAML config from {CONFIG_PATH}: {e}")
@@ -59,8 +59,8 @@ is_docker = os.getenv("RUN_CONTEXT") == "docker" or CONFIG_MODE == "docker"
 RUNTIME_CONFIG = {**DEFAULT_RUNTIME, **CONFIG.get("runtime", {})}
 
 # Adjust paths based on context
-LOCAL_DATA_BASE = Path(".koi/shared_cache") # Define a local base if needed
-DOCKER_CACHE_DIR_DEFAULT = "/data/cache" # Default for Docker
+LOCAL_DATA_BASE = Path(".koi/shared_cache")  # Define a local base if needed
+DOCKER_CACHE_DIR_DEFAULT = "/data/cache"  # Default for Docker
 
 # Determine Cache Dir
 if is_docker:
@@ -69,10 +69,10 @@ else:
     # For local, use the config value or construct relative path
     cache_dir_config = RUNTIME_CONFIG.get("cache_dir")
     if cache_dir_config:
-        CACHE_DIR = str(Path(cache_dir_config)) # Respect config if set
+        CACHE_DIR = str(Path(cache_dir_config))  # Respect config if set
     else:
         LOCAL_DATA_BASE.mkdir(parents=True, exist_ok=True)
-        CACHE_DIR = str(LOCAL_DATA_BASE) # Fallback local path
+        CACHE_DIR = str(LOCAL_DATA_BASE)  # Fallback local path
 
 # Ensure the resolved CACHE_DIR exists
 Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)

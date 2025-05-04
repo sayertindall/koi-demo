@@ -9,18 +9,11 @@ from .config import (
     BASE_URL,
     COORDINATOR_URL,
     CACHE_DIR,
-) 
+)
 
 # Import the RID type this processor consumes
-logger = logging.getLogger(__name__) 
-try:
-    # Attempt import - adjust path if project structure changes
-    from nodes.koi_net_hackmd_sensor_node.rid_types import HackMDNote
-except ImportError as e:
-    logger.error(f"Failed to import HackMDNote: {e}. Ensure sensor node is accessible or use shared RID definitions. Using placeholder.")
-    # Define a placeholder if import fails
-    class HackMDNote:
-        pass 
+logger = logging.getLogger(__name__)
+
 
 name = "processor-b"
 
@@ -31,7 +24,9 @@ logger.info(f"Ensured identity directory exists: {identity_dir}")
 
 # Check required config values
 if not BASE_URL or not COORDINATOR_URL or not CACHE_DIR:
-    raise ValueError("Essential configuration (BASE_URL, COORDINATOR_URL, CACHE_DIR) is missing or failed to load!")
+    raise ValueError(
+        "Essential configuration (BASE_URL, COORDINATOR_URL, CACHE_DIR) is missing or failed to load!"
+    )
 
 # Initialize the KOI-net Node Interface for Processor B
 node = NodeInterface(
@@ -39,9 +34,8 @@ node = NodeInterface(
     profile=NodeProfile(
         base_url=BASE_URL,
         node_type=NodeType.FULL,
-        provides=NodeProvides( # Processor B provides no new RIDs per PRD
-            event=[], 
-            state=[]
+        provides=NodeProvides(  # Processor B provides no new RIDs per PRD
+            event=[], state=[]
         ),
         # Consumes HackMDNote implicitly via handlers
     ),
@@ -56,4 +50,4 @@ logger.info(f"Initialized NodeInterface for Processor B: {node.identity.rid}")
 logger.info(f"Node attempting first contact with: {COORDINATOR_URL}")
 
 # Import handlers after node is initialized
-from . import handlers 
+from . import handlers

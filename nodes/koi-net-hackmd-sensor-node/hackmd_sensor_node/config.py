@@ -26,8 +26,8 @@ ENV_PATH = CONFIG_DIR / "global.env"
 if ENV_PATH.is_file():
     with open(ENV_PATH) as f:
         for line in f:
-            if line.strip() and not line.startswith('#') and '=' in line:
-                k, v = line.strip().split('=', 1)
+            if line.strip() and not line.startswith("#") and "=" in line:
+                k, v = line.strip().split("=", 1)
                 os.environ.setdefault(k, v)
 
 # Load YAML config using ruamel.yaml
@@ -37,7 +37,7 @@ if CONFIG_PATH.is_file():
         yaml_loader = YAML(typ="safe")
         with open(CONFIG_PATH) as f:
             CONFIG = yaml_loader.load(f)
-        if CONFIG is None: # Handle empty file case
+        if CONFIG is None:  # Handle empty file case
             CONFIG = {}
     except Exception as e:
         logging.error(f"Error loading YAML config from {CONFIG_PATH}: {e}")
@@ -148,6 +148,7 @@ if not HACKMD_API_TOKEN:
 # --- State Management (Moved from __main__) ---
 polling_state: Dict[str, str] = {}  # Maps note_id to last_modified_timestamp
 
+
 def load_polling_state():
     """Loads the polling state from the JSON file specified by STATE_FILE_PATH."""
     global polling_state
@@ -173,6 +174,7 @@ def load_polling_state():
         )
         polling_state = {}
 
+
 def save_polling_state():
     """Saves the current polling state to the JSON file specified by STATE_FILE_PATH."""
     global polling_state
@@ -189,6 +191,7 @@ def save_polling_state():
             f"Unexpected error writing polling state file {state_path}: {e}",
             exc_info=True,
         )
+
 
 # Load initial state when config module is imported
 load_polling_state()
