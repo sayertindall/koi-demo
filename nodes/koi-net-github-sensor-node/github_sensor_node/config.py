@@ -92,25 +92,29 @@ else:
 env_state_file = os.getenv("GITHUB_STATE_FILE")
 yaml_state_file = RUNTIME_CONFIG.get("state_file")
 
+# Determine the state file path string first
+state_file_path_str: str
 if env_state_file:
-    STATE_FILE = env_state_file
+    state_file_path_str = env_state_file
 elif yaml_state_file and "${RID_CACHE_DIR}" in yaml_state_file and env_cache_dir:
-    # If yaml uses placeholder and env var is set, substitute env var
-    STATE_FILE = yaml_state_file.replace("${RID_CACHE_DIR}", env_cache_dir)
+    state_file_path_str = yaml_state_file.replace("${RID_CACHE_DIR}", env_cache_dir)
 elif yaml_state_file and "${RID_CACHE_DIR}" not in yaml_state_file:
-    # If yaml is set directly, use it
-    STATE_FILE = yaml_state_file
+    state_file_path_str = yaml_state_file
 else:
-    # Fallback: place it inside the resolved CACHE_DIR
     default_filename = "github_state.json"
-    STATE_FILE = str(Path(CACHE_DIR) / default_filename)
+    # Ensure CACHE_DIR is a Path object before joining
+    cache_dir_path = Path(CACHE_DIR)
+    state_file_path_str = str(cache_dir_path / default_filename)
     logger.warning(
-        f"GITHUB_STATE_FILE env var not set and yaml state_file missing or uses placeholder without RID_CACHE_DIR env var. Falling back to default: {STATE_FILE}"
+        f"GITHUB_STATE_FILE env var not set and yaml state_file missing or uses placeholder without RID_CACHE_DIR env var. Falling back to default: {state_file_path_str}"
     )
 
-# Ensure directories exist
-Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
-Path(STATE_FILE).parent.mkdir(parents=True, exist_ok=True) # Ensure state file dir exists
+# Now convert the determined string path to a Path object
+STATE_FILE = Path(state_file_path_str)
+
+# Ensure directories exist using the Path object
+Path(CACHE_DIR).mkdir(parents=True, exist_ok=True) # Ensure CACHE_DIR is also treated as Path if needed elsewhere
+STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 # Sensor specific settings
 SENSOR_KIND: str = SENSOR_CONFIG.get("kind", "github")
@@ -204,7 +208,7 @@ def update_state_file(repo_name: str, last_sha: str):
     """Updates the state file with the latest processed SHA for a repo."""
     global LAST_PROCESSED_SHA
     LAST_PROCESSED_SHA[repo_name] = last_sha
-
+    
     state_path = STATE_FILE
     try:
         state_path.parent.mkdir(parents=True, exist_ok=True)
