@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "koi-demo"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "httpx",
+    "python-dotenv",
+    "rid-lib>=3.2.1",
+    "koi-net==1.0.0b12",
+    "ruamel.yaml"
+]
+
+# Add setuptools configuration to control package discovery
+[tool.setuptools]
+# Explicitly state no top-level Python modules are intended
+py-modules = [] 
+
+[tool.setuptools.packages.find]
+where = ["."]  # Search in the root directory
+include = ["nodes*"]  # Include only 'nodes' and its sub-packages
+exclude = ["config*"] # Exclude the 'config' directory
+namespaces = false # Assume 'nodes' itself is not a namespace package
+

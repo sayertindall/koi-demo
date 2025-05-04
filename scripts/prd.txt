@@ -1,0 +1,443 @@
+{CONTEXT}
+### Implementation Scope — what still must be written
+
+*everything else already exists*
+
+Only four codebases are available today:
+
+* **koi‑net** – NodeInterface, FastAPI wiring, event queues, edge‑handshake logic (`pip install koi-net`).
+* **rid‑lib** – RID classes plus manifest / bundle helpers (`pip install rid-lib`).
+* **GitHubSensor** & **HackMDSensor** – working ingress nodes that already emit manifests and serve bundles (GitHub repos).
+* **Coordinator** – fully functional subnet root (GitHub repo).
+
+Everything else—including **Docker images** and **processors**—must be produced:
+
+| Item to build                                                                    | Purpose                                                                                       | Minimum feature set                                                                                                                                                           |                                                   |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| **Dockerfiles + images** for **Coordinator**, **GitHubSensor**, **HackMDSensor** | Containerise the existing Python repos.                                                       | • `FROM python:3.11‑slim` → `pip install -e .` → `ENTRYPOINT ["python", "main.py"]`.<br/>• Expose KOI port; add `/health` route for Compose.                                  |                                                   |
+| **Processor A (Repo Indexer)**                                                   | Subscribe to GitHub manifests, optionally dereference bundles, keep a local searchable index. | • Use `koi_net.NodeInterface`.<br/>• Subscribe to `CommitManifestRID` & `PullRequestManifestRID`.<br/>• On deref, store bundles in RID cache.<br/>• Provide \`/search?q=\<sha | keyword>\` endpoint; **no new RIDs are emitted**. |
+| **Processor B (Note Indexer)**                                                   | Subscribe to HackMD manifests, dereference bundles, keep a Markdown index.                    | • Same NodeInterface skeleton.<br/>• Subscribe to `NoteManifestRID`.<br/>• Store bundles; expose \`/search?q=\<tag                                                            | title>\`.                                         |
+| *(optional)* **Shared utility lib**                                              | Re‑usable helper for simple text/sha searches across the RID cache.                           | Tiny Python module, no external deps.                                                                                                                                         |                                                   |
+| **Dockerfiles + images** for **Processor A/B**                                   | Containerise the two new processors.                                                          | Standard slim image, install repo, expose KOI + `/search` port.                                                                                                               |                                                   |
+| **Config directory**                                                             | YAMLs for all five nodes + `.env` tokens.                                                     | Sensors point to real repos / HackMD team; processors list which sensor edges to follow.                                                                                      |                                                   |
+| **docker‑compose.yml**                                                           | Orchestrate the five services on one bridge network.                                          | Service‑name DNS discovery; health checks on `/health`.                                                                                                                       |                                                   |
+| *(optional)* **orchestrate.py**                                                  | One‑command launcher for CI / local dev.                                                      | Read YAML → render `docker-compose.yml` → run `docker compose up`.                                                                                                            |                                                   |
+
+> **Simplification:** Processor A and Processor B **do not ingest data directly**. They listen to manifests from the sensors, pull bundles when needed, and serve local search APIs—no risk scores, TODO extraction, or new RIDs.
+{CONTEXT}
+
+## 1  Executive Summary
+
+The Autonomous Sensor‑Processor demo showcases a _self‑forming knowledge mesh_ that turns two everyday SaaS feeds—GitHub repositories and HackMD documents—into a continuously updated, query‑ready knowledge graph. At its core, the system pairs **sensors** (specialised ingress nodes) with **processors** (analytic nodes) and binds them together through a lightweight **Coordinator** that speaks the KOI (Core Orchestration Interface) protocol.
+
+When the Coordinator boots it exposes an empty **subnet**—a logical namespace inside KOI. Each sensor registers, back‑fills historical data as _manifest_ RIDs, and advertises its ability to serve full _bundle_ payloads on demand. Processors arrive later, automatically peer with their respective sensors, selectively dereference the manifests they care about, and publish new knowledge objects (e.g., risk scores or action items). Once Processor A and Processor B discover each other they negotiate a direct edge and begin exchanging their derived insights, completing an entirely autonomous handshake without manual wiring.
+
+The demo therefore illustrates three key capabilities:
+
+1. **Declarative ingestion** – any data source is reduced to strongly‑typed RIDs plus a dereference link.
+2. **Autonomous topology formation** – nodes propose and accept edges through a single Coordinator API.
+3. **Composable reasoning** – processors can be added, removed, or swapped without touching the ingestion layer.
+
+---
+
+## 2  Core Libraries & Frameworks
+| Library                                    | Role & Integration Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **KOI (Core Orchestration Interface)**     | KOI defines the canonical HTTP endpoints (`/edges/*`, `/events/*`, `/bundles/*`) that every node exposes. In this demo all communication—manifest broadcast, edge proposals, dereference requests—travels over KOI. Each node initialises a _NodeInterface_ provided by the `koi‑net` package, which mounts these routes onto a FastAPI app and publishes node metadata (ID, capabilities) back to the Coordinator on start‑up.                                                                |
+| **RID‑lib (Reference Identifier Library)** | RID‑lib supplies the strongly‑typed identifier classes (e.g., `GitHubCommitRID`, `HackMDNoteRID`). Every sensor constructs **Manifest** objects (hash + metadata) and stores them in a disk cache; processors later resolve them into **Bundle** objects with full payloads. Because RIDs inherit from Pydantic `BaseModel`, the shapes are validated at runtime and serialised automatically in the KOI event stream. No additional configuration is required beyond setting `RID_CACHE_DIR`. |
+| **Generic Sensor SDK**                     | A thin helper layer that wraps `koi‑net` to make writing new sensors trivial. It furnishes an async _back‑fill loop_, optional webhook plumbing, and helper mixins for “manifest first, bundle on dereference” behaviour. In the demo both GitHub and HackMD sensors are less than 200 lines thanks to this SDK.                                                                                                                                                                               |
+
+
+
+## 3  System Architecture
+
+### 3.1 Architecture Overview
+
+A **subnet** is simply a GUID namespace plus a gossip address book. The first node you launch—the **Coordinator**—creates a new subnet and becomes its root. All subsequent nodes point to the Coordinator’s URL in their config; on boot they execute a `/edges/propose` call that says _“I am node X, I offer streams \[event, state], here is my public URL.”_
+
+Sensors hold a **unidirectional** edge back to the Coordinator but a **bidirectional** edge to the processor(s) that consume their data. Once a processor accepts a sensor edge it begins receiving _manifest_ events. Processors are themselves peers and may negotiate a **knowledge edge** with each other, enabling them to exchange derived RIDs without burdening the Coordinator.
+
+Because every data object is referenced by a RID, processors can request the _minimal_ data required: first a manifest to see if anything changed, then a bundle only when analysis is required. This keeps bandwidth low while preserving full‑fidelity access when needed.
+
+### 3.2 Mermaid Component Diagram
+
+Architecture diagram
+
+
+// Main Processors
+COMPONENT: Processor A
+  TYPE: Processing Node
+  CONNECTED_TO: [GitHub Sensor, Coordinator, Processor B, local rules & local context]
+  CONFIG: {where it runs, how it behaves}
+
+COMPONENT: Processor B
+  TYPE: Processing Node
+  CONNECTED_TO: [Hackmd Sensor, Coordinator, Processor A, local rules & local context]
+  CONFIG: {where it runs, how it behaves}
+
+// Coordinator
+COMPONENT: Coordinator
+  TYPE: Central Node
+  STYLE: Dashed border (indicates logical/virtual component)
+  CONNECTED_TO: [Processor A, Processor B, GitHub Sensor, Hackmd Sensor]
+  CONNECTION_STYLE: Dashed lines (indicates logical connections)
+
+// Sensors
+COMPONENT: GitHub Sensor
+  TYPE: Data Source Connector
+  CONNECTED_TO: [Processor A, repos "sensed"]
+  CONFIG: {where it runs, what it senses}
+
+COMPONENT: Hackmd Sensor
+  TYPE: Data Source Connector
+  CONNECTED_TO: [Processor B, documents "sensed"]
+  CONFIG: {where it runs, what it senses}
+
+// Storage Components
+COMPONENT: local rules & local context (left)
+  TYPE: Database
+  SHAPE: Cylinder
+  CONNECTED_TO: [Processor A]
+
+COMPONENT: local rules & local context (right)
+  TYPE: Database
+  SHAPE: Cylinder
+  CONNECTED_TO: [Processor B]
+
+// Data Sources
+COMPONENT: repos "sensed"
+  TYPE: External Data Source
+  SHAPE: Document/Note
+  CONNECTED_TO: [GitHub Sensor]
+  CONNECTION_STYLE: Dashed line (indicates data flow)
+
+COMPONENT: documents "sensed"
+  TYPE: External Data Source
+  SHAPE: Document/Note
+  CONNECTED_TO: [Hackmd Sensor]
+  CONNECTION_STYLE: Dashed line (indicates data flow)
+
+// Config Components
+COMPONENT: config (top left)
+  TYPE: Configuration
+  SHAPE: Circle
+  CONTENT: "config: where it runs, how it behaves"
+  CONNECTED_TO: [Processor A]
+
+COMPONENT: config (top right)
+  TYPE: Configuration
+  SHAPE: Circle
+  CONTENT: "config: where it runs, how it behaves"
+  CONNECTED_TO: [Processor B]
+
+COMPONENT: config (bottom left)
+  TYPE: Configuration
+  SHAPE: Circle
+  CONTENT: "config: where it runs, what it senses"
+  CONNECTED_TO: [GitHub Sensor]
+
+COMPONENT: config (bottom right)
+  TYPE: Configuration
+  SHAPE: Circle
+  CONTENT: "config: where it runs, what it senses"
+  CONNECTED_TO: [Hackmd Sensor]
+
+// Layout Information
+LAYOUT:
+  - Grid-based background
+  - Processors at top center
+  - Coordinator in middle center
+  - Sensors below processors
+  - Data sources at bottom
+  - Config circles adjacent to their respective components
+  - Databases on left and right sides
+
+```mermaid
+flowchart LR
+    %% Main components with clear labels
+    subgraph Orchestration["0 • Bootstrap (docker-compose + config.yaml)"]
+        Orchestrator["orchestrate.py"]
+    end
+
+    subgraph Sensors["2 • Sensors register"]
+        GitHubSensor["GitHub Sensor"]
+        HackMDSensor["HackMD Sensor"]
+    end
+
+    Coordinator["1 • Coordinator (subnet root)"]
+
+    subgraph Processors["3 • Full nodes (processors)"]
+        ProcA["Processor A"]
+        ProcB["Processor B"]
+    end
+
+    %% Cleaner edge relationships with consistent styling
+    Orchestrator -->|"1. compose up"| Coordinator
+    Orchestrator -->|"2. initialize"| GitHubSensor & HackMDSensor
+    Orchestrator -->|"3. initialize"| ProcA & ProcB
+
+    GitHubSensor -->|"4. edge proposal"| Coordinator
+    HackMDSensor -->|"5. edge proposal"| Coordinator
+
+    GitHubSensor -->|"6. manifests"| ProcA
+    HackMDSensor -->|"7. manifests"| ProcB
+
+    ProcA -->|"8. edge proposal"| Coordinator
+    ProcB -->|"9. edge proposal"| Coordinator
+
+    ProcA <-->|"10. knowledge edge"| ProcB
+
+    %% Styling
+    classDef orchestration fill:#fffae6,stroke:#d6b656
+    classDef sensors fill:#dae8fc,stroke:#6c8ebf
+    classDef coordinator fill:#d5e8d4,stroke:#82b366
+    classDef processors fill:#e1d5e7,stroke:#9673a6
+
+    class Orchestration orchestration
+    class Sensors sensors
+    class Coordinator coordinator
+    class Processors processors
+```
+
+
+
+## 4  Custom Code Components
+
+Each component below implements the KOI node interface, participates in the Coordinator‑mediated edge handshake, and either **emits** or **consumes** RIDs.
+
+| Component                    | Purpose                                                                             | Inputs → Outputs                                                                                    | Internal Flow                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CoordinatorLauncher**      | Launches the FastAPI coordinator service and seeds the subnet’s address book.       | `/edges/propose` → `/edges/accept`                                                                  | 1. Start FastAPI on `0.0.0.0:8080`.<br/>2. Load or create **`identity.json`** (node’s own RID and profile).<br/>3. Accept every proposal (demo mode) and return a signed token in `/edges/accept`.<br/>4. Store remote nodes and edges as RID **bundles** in the local cache.<br/>5. Rebuild the in‑memory `NetworkGraph` from those cached bundles on every restart. |
+| **GitHubSensorNode**         | Watches target repos and emits RIDs for commits, issues, PRs.                       | GitHub webhook JSON → `CommitManifestRID` / `IssueManifestRID`<br/>Dereference request → zip bundle | • Setup webhook or polling.<br/>• For each event create Manifest + store `.tar.gz` in cache.<br/>• Propose edge → Coordinator.<br/>• Serve bundle on `GET /bundles/{rid}`.                                                                                                                                                                                            |
+| **HackMDSensorNode**         | Streams HackMD note events.                                                         | HackMD API JSON → `NoteManifestRID`<br/>Dereference request → Markdown bundle                       | • Poll `/teams/{id}/notes` every 30 s.<br/>• Emit manifests with `lastChangedAt` hash.<br/>• Serve full note on dereference.                                                                                                                                                                                                                                          |
+| **ProcessorA**               | Scores GitHub PRs for risk, publishes `RiskScoreRID`.                               | `CommitManifestRID` → deref → zip → `RiskScoreRID`                                                  | • Subscribe to GitHubSensor edge.<br/>• Filter for `pull_request` events.<br/>• Run `risk = f(churn, files_changed)`.<br/>• Publish risk score manifest + bundle.                                                                                                                                                                                                     |
+| **ProcessorB**               | Extracts action items from HackMD notes, links them to PR risk scores.              | `NoteManifestRID` + `RiskScoreRID` → `ActionItemRID`                                                | • Subscribe to HackMDSensor.<br/>• Parse Markdown ‑> tasks list.<br/>• Look up matching `RiskScoreRID` via graph query.<br/>• Publish enriched action items.                                                                                                                                                                                                          |
+| **OrchestratorScript (CLI)** | One‑stop launcher that assembles configs, pulls images, and invokes Docker Compose. | `config/*.yaml`, `global.env` → running containers                                                  | • Parse YAMLs.<br/>• Render `docker‑compose.yml` template.<br/>• `subprocess.run("docker compose up")`.<br/>• Tail logs and exit when health checks green.                                                                                                                                                                                                            |
+
+**Example Pydantic model (simplified)**
+
+```python
+class CommitManifestRID(RID):
+    scheme: Literal["urn"]
+    namespace: Literal["github"]
+    reference: str  # e.g. "org/repo@sha"
+
+class CommitManifest(Manifest):
+    rid: CommitManifestRID
+    sha: str
+    author: str
+    message: str
+```
+
+
+
+## 5  Runtime Handshake & Data Flow
+
+The demo progresses through five automatic stages:
+
+1. **Deploy Coordinator** – `CoordinatorLauncher` starts first, creating an empty subnet.
+2. **Deploy Sensors** – each sensor container comes up, discovers the Coordinator, and proposes an edge. The Coordinator responds with an _accept_ message, completing registration.
+3. **Deploy Processors** – processors repeat the same proposal/accept dance, then subscribe to sensor event streams.
+4. **Autonomous Edge Negotiation** – sensors and processors negotiate direct edges; processors also discover each other and form a _knowledge edge_.
+5. **Bidirectional Knowledge Exchange** – manifests flow sensor → processor; bundles are pulled on demand; derived RIDs flow processor → processor.
+
+### 5.1 Mermaid Sequence Diagram
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Coordinator
+  participant G as GitHubSensor
+  participant H as HackMDSensor
+  participant A as ProcessorA
+  participant B as ProcessorB
+
+  C->>G: POST /edges/propose
+  G-->>C: /edges/accept
+  C->>H: POST /edges/propose
+  H-->>C: /edges/accept
+  C->>A: POST /edges/propose
+  A-->>C: /edges/accept
+  C->>B: POST /edges/propose
+  B-->>C: /edges/accept
+  A->>G: subscribe(manifests)
+  B->>H: subscribe(manifests)
+  A->>G: GET /bundles/{rid}
+  G-->>A: zip bundle
+  B->>H: GET /bundles/{rid}
+  H-->>B: md bundle
+  A->>B: POST /events (RiskScoreRID)
+  B->>A: POST /events (ActionItemRID)
+```
+
+
+
+## 6  Configuration
+
+Each container reads a YAML config plus an optional `.env` file. This keeps code immutable and shifts environment‑specific values (API tokens, repo lists, polling intervals) into declarative files that Ops can tweak without a rebuild.
+
+### 6.1 Repository Layout
+
+```
+demo/
+├─ config/
+│  ├─ global.env
+│  ├─ coordinator.yaml
+│  ├─ github-sensor.yaml
+│  ├─ hackmd-sensor.yaml
+│  ├─ processor-a.yaml
+│  └─ processor-b.yaml
+└─ orchestrate.py
+```
+
+### 6.2 Sample Sensor Config
+
+```yaml
+# config/github-sensor.yaml
+sensor:
+  kind: github
+  mode: poll # "webhook" also supported
+  poll_interval: 30 # seconds
+  repos:
+    - "blockscience/demo-repo"
+    - "blockscience/infra-repo"
+edges:
+  coordinator_url: "http://coordinator:8080"
+runtime:
+  cache_dir: "/data/cache"
+env:
+  GITHUB_TOKEN: ${GITHUB_TOKEN}
+```
+
+- **Fields explained**
+
+  - `kind` – loader in Generic Sensor SDK chooses GitHub adapter.
+  - `poll_interval` – controls back‑fill cadence; `0` tells the SDK to rely solely on webhooks.
+  - `repos` – list of `<org>/<repo>` targets; wildcards supported.
+  - `runtime.cache_dir` – mount point that persists manifests/bundles across restarts.
+
+### 6.3 Environment Variables (`global.env`)
+
+```
+GITHUB_TOKEN=ghp_xxxxxxxxxxx
+HACKMD_TOKEN=tok_xxxxxxxxxxx
+SUBNET_ID=demo-subnet
+RID_CACHE_DIR=/data/cache
+```
+
+**Defaults vs. overrides** – Each YAML provides sane defaults; any key can be overridden by exporting an env var of the same name (e.g., `POLL_INTERVAL=10 docker compose up`).
+
+
+
+## 7  Docker Orchestration
+
+Docker Compose offers a repeatable, single‑command launch that mirrors production topology while remaining laptop‑friendly. Service names (`coordinator`, `github-sensor`, …) double as DNS hostnames on the **demo-net** bridge, which means each node can discover its peers via simple `http://<service>:8080` URLs—no extra service discovery layer required.
+
+### 7.1 Service Definitions & Network
+
+| Service           | Image                       | Ports | Volumes    | Purpose                    |
+| ----------------- | --------------------------- | ----- | ---------- | -------------------------- |
+| **coordinator**   | `demo/coordinator:latest`   | 8080  | –          | Subnet root & edge broker  |
+| **github‑sensor** | `demo/github-sensor:latest` | 8001  | `gh-cache` | Ingests GitHub repo events |
+| **hackmd‑sensor** | `demo/hackmd-sensor:latest` | 8002  | `hm-cache` | Ingests HackMD note events |
+| **processor‑a**   | `demo/processor-a:latest`   | 8011  | `pa-cache` | GitHub analytics           |
+| **processor‑b**   | `demo/processor-b:latest`   | 8012  | `pb-cache` | HackMD analytics           |
+
+All containers join **demo-net**, a user‑defined bridge network. The Coordinator implicitly “assigns” the subnet label but actual routing is handled by Docker’s embedded DNS.
+
+### 7.2 Startup Sequence Diagram
+
+```mermaid
+flowchart TD
+  Start(["docker compose up"])
+  Ctr[Coordinator]
+  GS[GitHub Sensor]
+  HS[HackMD Sensor]
+  PA[Processor A]
+  PB[Processor B]
+
+  Start --> Ctr
+  Ctr --> GS
+  Ctr --> HS
+  GS --> PA
+  HS --> PB
+  PA --> PB
+```
+
+### 7.3 Example `docker-compose.yml`
+
+```yaml
+version: "3.8"
+
+services:
+  coordinator:
+    image: demo/coordinator:latest
+    container_name: coordinator
+    ports:
+      - "8080:8080"
+    networks: [demo-net]
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 10s
+      retries: 5
+
+  github-sensor:
+    image: demo/github-sensor:latest
+    container_name: github-sensor
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    volumes:
+      - gh-cache:/data/cache
+    env_file: config/global.env
+    networks: [demo-net]
+
+  hackmd-sensor:
+    image: demo/hackmd-sensor:latest
+    container_name: hackmd-sensor
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    volumes:
+      - hm-cache:/data/cache
+    env_file: config/global.env
+    networks: [demo-net]
+
+  processor-a:
+    image: demo/processor-a:latest
+    container_name: processor-a
+    depends_on:
+      - github-sensor
+    volumes:
+      - pa-cache:/data/cache
+    env_file: config/global.env
+    networks: [demo-net]
+
+  processor-b:
+    image: demo/processor-b:latest
+    container_name: processor-b
+    depends_on:
+      - hackmd-sensor
+    volumes:
+      - pb-cache:/data/cache
+    env_file: config/global.env
+    networks: [demo-net]
+
+networks:
+  demo-net:
+    driver: bridge
+
+volumes:
+  gh-cache:
+  hm-cache:
+  pa-cache:
+  pb-cache:
+```
+
+> **Key sections**
+>
+> - `depends_on` with `condition: service_healthy` ensures sensors wait for the Coordinator’s health check before registering.
+> - Named volumes keep RID caches persistent for quicker restarts.
+> - All services join _one_ bridge network to keep URL discovery trivial.
+
+With this Compose file and the configs above, the entire demo spins up with a single command and showcases an end‑to‑end, autonomous data pipeline—from raw GitHub commits and HackMD edits to enriched cross‑referenced knowledge objects—without a single manual edge configuration.

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "github-sensor-node"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "httpx",
+    "python-dotenv",
+    "rid-lib>=3.2.3",
+    "koi-net==1.0.0b12",
+    "PyGithub",
+    "aiohttp",
+    "rich", # Added for logging
+    "ruamel.yaml", # Added for YAML config loading
+    "python-dotenv" # Added for loading .env in local runs
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}

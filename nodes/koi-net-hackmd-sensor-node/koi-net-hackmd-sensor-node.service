@@ -1,0 +1,11 @@
+[Unit]
+Description=KOI-net HackMD Sensor Node Service
+After=network.target
+
+[Service]
+WorkingDirectory=/home/dev/koi-net-hackmd-sensor-node
+ExecStart=/home/dev/koi-net-hackmd-sensor-node/venv/bin/python3 -m hackmd_sensor_node
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

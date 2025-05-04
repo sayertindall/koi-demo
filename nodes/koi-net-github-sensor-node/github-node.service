@@ -1,0 +1,11 @@
+[Unit]
+Description=KOI-net Github Node Service
+After=network.target
+
+[Service]
+WorkingDirectory=/Users/sayertindall/Documents/GitHub/block.science/koinets/koi-github-node/services/github
+ExecStart=/Users/sayertindall/Documents/GitHub/block.science/koinets/koi-github-node/.venv/bin/python3 -m node
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

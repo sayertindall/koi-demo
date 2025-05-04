@@ -1,0 +1,2056 @@
+Directory structure:
+└── github/
+    ├── README.md
+    ├── __init__.py
+    ├── github-node.service
+    ├── pyproject.toml
+    ├── repomix-output.xml
+    ├── .env.example
+    ├── .gitignore
+    └── node/
+        ├── __init__.py
+        ├── __main__.py
+        ├── backfill.py
+        ├── config.py
+        ├── core.py
+        ├── loader.py
+        ├── server.py
+        ├── types.py
+        ├── webhook.py
+        └── handlers/
+            └── github.py
+
+
+Files Content:
+
+================================================
+FILE: services/github/README.md
+================================================
+
+
+
+================================================
+FILE: services/github/__init__.py
+================================================
+
+
+
+================================================
+FILE: services/github/github-node.service
+================================================
+[Unit]
+Description=KOI-net Github Node Service
+After=network.target
+
+[Service]
+WorkingDirectory=/Users/sayertindall/Documents/GitHub/block.science/koinets/koi-github-node/services/github
+ExecStart=/Users/sayertindall/Documents/GitHub/block.science/koinets/koi-github-node/.venv/bin/python3 -m node
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+================================================
+FILE: services/github/pyproject.toml
+================================================
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "github"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "httpx",
+    "python-dotenv",
+    "rid-lib>=3.2.3",
+    "koi-net",
+    "PyGithub",
+    "aiohttp",
+    "rich" # Added for logging
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+
+================================================
+FILE: services/github/repomix-output.xml
+================================================
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+<additional_info>
+
+</additional_info>
+
+</file_summary>
+
+<directory_structure>
+node/
+  handlers/
+    github.py
+  __init__.py
+  __main__.py
+  backfill.py
+  config.py
+  core.py
+  loader.py
+  server.py
+  types.py
+  webhook.py
+.gitignore
+github-node.service
+pyproject.toml
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="node/handlers/github.py">
+import logging
+from rid_lib.ext import Bundle
+# Assuming GithubCommit RID type is accessible
+from ..core import node # Import the initialized node instance
+from ..types import GithubCommit # Ensure this import is correct
+
+# Imports needed for coordinator_contact handler from refactor.md
+from koi_net.processor.handler import HandlerType
+from koi_net.processor.knowledge_object import KnowledgeObject, KnowledgeSource
+from koi_net.processor.interface import ProcessorInterface
+from koi_net.protocol.node import NodeProfile
+from koi_net.protocol.event import EventType
+from koi_net.protocol.edge import EdgeType
+from koi_net.protocol.helpers import generate_edge_bundle
+from rid_lib.types import KoiNetNode # Assuming this RID type is accessible
+
+logger = logging.getLogger(__name__)
+
+@node.processor.register_handler(HandlerType.Network, rid_types=[KoiNetNode])
+def coordinator_contact(processor: ProcessorInterface, kobj: KnowledgeObject):
+    """Handles discovery of the coordinator node (or other nodes providing KoiNetNode events).
+    
+    On discovering a NEW coordinator, proposes a WEBHOOK edge for bidirectional
+    communication and requests a list of other known nodes (sync).
+    (Based on refactor.md example)
+    """
+    if kobj.normalized_event_type != EventType.NEW:
+        logger.debug(f"Ignoring non-NEW event for KoiNetNode {kobj.rid}")
+        return
+        
+    # Validate that the discovered node actually provides network events
+    try:
+        profile = kobj.bundle.validate_contents(NodeProfile)
+        if KoiNetNode not in profile.provides.event:
+            logger.debug(f"Node {kobj.rid} does not provide KoiNetNode events. Ignoring.")
+            return
+    except Exception as e:
+        logger.warning(f"Could not validate NodeProfile for {kobj.rid}: {e}")
+        return
+
+    logger.info(f"Identified potential coordinator/peer: {kobj.rid}; proposing WEBHOOK edge")
+    try:
+        # Propose edge FROM coordinator TO self
+        edge_bundle = generate_edge_bundle(
+            source=kobj.rid, 
+            target=node.identity.rid,
+            edge_type=EdgeType.WEBHOOK,
+            rid_types=[KoiNetNode] # Specify the type of information this edge carries
+        )
+        processor.handle(bundle=edge_bundle)
+    except Exception as e:
+        logger.error(f"Failed to generate or handle WEBHOOK edge bundle for {kobj.rid}: {e}", exc_info=True)
+
+    # Sync network nodes from the discovered node
+    logger.info(f"Syncing network nodes from {kobj.rid}")
+    try:
+        payload = processor.network.request_handler.fetch_rids(kobj.rid, rid_types=[KoiNetNode])
+        if not payload or not payload.rids:
+             logger.warning(f"Received empty RIDs payload from {kobj.rid} during sync.")
+             return
+             
+        logger.debug(f"Received {len(payload.rids)} RIDs from {kobj.rid}")
+        for rid in payload.rids:
+            # Don't process self or already known nodes
+            if rid == processor.identity.rid or processor.cache.exists(rid):
+                continue
+            logger.debug(f"Handling discovered RID from sync: {rid}")
+            # Handle the RID to fetch its details (profile, etc.)
+            processor.handle(rid=rid, source=KnowledgeSource.External)
+    except Exception as e:
+        logger.error(f"Failed during network sync with {kobj.rid}: {e}", exc_info=True)
+
+@node.processor.register_handler(HandlerType.Bundle, rid_types=[GithubCommit])
+def handle_github_commit(processor: ProcessorInterface, kobj: KnowledgeObject):
+    """
+    Basic handler for processing GithubCommit bundles.
+    Currently just logs information.
+    
+    Args:
+        bundle: The Bundle object containing the GithubCommit RID and contents.
+    """
+    try:
+        # kobj.bundle is guaranteed to exist in Bundle handler phase
+        bundle = kobj.bundle
+        rid: GithubCommit = bundle.rid
+        contents: dict = bundle.contents
+        
+        logger.info(f"Processing commit: {rid} (Normalized Type: {kobj.normalized_event_type}, Source: {kobj.source})")
+        # Log some details from the contents for visibility
+        logger.debug(f"  Author: {contents.get('author_name')} <{contents.get('author_email')}>")
+        logger.debug(f"  Message: {contents.get('message', '').splitlines()[0][:80]}...") # Log first line up to 80 chars
+        logger.debug(f"  URL: {contents.get('html_url')}")
+
+        # Default Bundle handler will write to cache based on normalized_event_type.
+        # If you needed to modify contents *before* caching, you would return
+        # the modified kobj here: return kobj
+
+        # If you wanted to stop processing this specific KObj (e.g., based on content),
+        # you could return STOP_CHAIN here: return STOP_CHAIN
+
+        # Returning None passes the kobj unchanged to the next handler in the chain
+        # (likely the default handler which performs the cache write)
+        return None
+
+    except Exception as e:
+        logger.error(f"Error handling GithubCommit bundle {kobj.rid}: {e}", exc_info=True)
+        # Decide if error should stop the pipeline for this KObj
+        # return STOP_CHAIN
+        return None # Continue processing despite handler error
+
+# Add a NEW handler specifically to propose a GithubCommit edge to the coordinator
+@node.processor.register_handler(HandlerType.Final, rid_types=[KoiNetNode])
+def propose_github_commit_edge_to_coordinator(processor: ProcessorInterface, kobj: KnowledgeObject):
+    # This handler runs after a NEW KoiNetNode is fully processed (cached, graph updated, default edges proposed)
+    # It's in the Final phase, less intrusive to core pipeline flow.
+    # Simplified logic: If we just processed a NEW KoiNetNode and it's the *only* other node in our graph besides ourselves,
+    # assume it's the coordinator and propose the GithubCommit edge.
+    if kobj.normalized_event_type != EventType.NEW:
+        return
+        
+    known_peers = processor.network.graph.get_neighbors()
+    if len(known_peers) == 1 and known_peers[0] == kobj.rid:
+        logger.info(f"Assuming {kobj.rid} is the coordinator. Proposing WEBHOOK edge for GithubCommit events.")
+        try:
+            github_edge_bundle = generate_edge_bundle(
+                source=node.identity.rid, # I am the source of these events
+                target=kobj.rid,           # The coordinator is the target
+                edge_type=EdgeType.WEBHOOK, # Use webhook
+                rid_types=[GithubCommit]    # Specify GithubCommit events
+            )
+            # Queue this new edge bundle for processing
+            processor.handle(bundle=github_edge_bundle)
+        except Exception as e:
+            logger.error(f"Failed to generate/handle GithubCommit edge bundle for {kobj.rid}: {e}", exc_info=True)
+
+logger.info("GithubCommit Bundle handler and KoiNetNode handlers registered.")
+</file>
+
+<file path="node/__init__.py">
+import logging
+from rich.logging import RichHandler
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[RichHandler()]
+)
+</file>
+
+<file path="node/__main__.py">
+import uvicorn
+from .config import PORT
+
+
+uvicorn.run("services.github.node.server:app", port=PORT, log_config=None)
+</file>
+
+<file path="node/backfill.py">
+import logging
+from github import Github, GithubException, RateLimitExceededException
+from github.Commit import Commit
+from rid_lib.ext import Bundle
+# Assuming GithubCommit RID type is accessible
+from .types import GithubCommit 
+from .core import node
+from .config import (
+    GITHUB_TOKEN, MONITORED_REPOS,
+    LAST_PROCESSED_SHA, update_state_file 
+)
+
+logger = logging.getLogger(__name__)
+
+# Initialize GitHub client (authenticated if token provided)
+github_client = Github(GITHUB_TOKEN) if GITHUB_TOKEN else Github()
+logger.info(f"GitHub client initialized. Authenticated: {bool(GITHUB_TOKEN)}")
+
+def perform_backfill():
+    """
+    One-time startup backfill: fetch all commits since LAST_PROCESSED_SHA
+    for each monitored repo, bundle them as NEW, and persist the latest SHA processed.
+    Processes commits oldest-to-newest after fetching.
+    """
+    logger.info("Starting GitHub backfill process...")
+    
+    # Load the state dictionary once before the loop
+    current_state = LAST_PROCESSED_SHA.copy() # Use a copy to avoid modifying during iteration if needed
+    newest_sha_processed_overall_map = {} # Track newest SHA per repo processed in this run
+
+    if not MONITORED_REPOS:
+        logger.warning("No repositories configured in MONITORED_REPOS. Backfill skipped.")
+        return
+
+    for repo_full_name in MONITORED_REPOS:
+        try:
+            owner, repo_name_only = repo_full_name.split('/')
+            # Get the last processed SHA for *this specific repository*
+            last_sha_for_repo = current_state.get(repo_full_name)
+            logger.info(f"Backfilling repository: {repo_full_name} since SHA: {last_sha_for_repo or 'beginning'}")
+
+            gh_repo = github_client.get_repo(repo_full_name)
+            commits_to_process_buffer: list[Commit] = []
+            
+            # Iterate commits newest-first until we find the last processed one
+            paginated_commits = gh_repo.get_commits()
+            logger.debug(f"Fetching commits for {repo_full_name}...")
+            commit_count = 0
+            for commit in paginated_commits:
+                commit_count += 1
+                # Check against the specific SHA for this repo
+                if last_sha_for_repo and commit.sha == last_sha_for_repo:
+                    logger.info(f"Found last processed SHA {last_sha_for_repo} in {repo_full_name}. Stopping fetch for this repo.")
+                    break
+                commits_to_process_buffer.append(commit)
+                # Safety break for potentially huge repos without a known SHA
+                # Adjust limit as needed
+                if commit_count % 100 == 0:
+                    logger.debug(f"Fetched {commit_count} commits for {repo_full_name} so far...")
+                # if commit_count > 1000: 
+                #    logger.warning(f"Reached fetch limit (1000) for {repo_full_name}. Consider adjusting.")
+                #    break 
+            
+            logger.info(f"Found {len(commits_to_process_buffer)} new commits in {repo_full_name} to backfill.")
+
+            # Process commits oldest → newest
+            newest_sha_processed_in_repo = None
+            for commit in reversed(commits_to_process_buffer):
+                try:
+                    rid = GithubCommit(owner=owner, repo=repo_name_only, sha=commit.sha)
+                    # Extract commit details carefully, handling potential missing attributes
+                    author = commit.commit.author
+                    committer = commit.commit.committer
+                    
+                    contents = {
+                        "sha": commit.sha,
+                        "message": commit.commit.message,
+                        "author_name": author.name if author else None,
+                        "author_email": author.email if author else None,
+                        "author_date": author.date.isoformat() if author and author.date else None,
+                        "committer_name": committer.name if committer else None,
+                        "committer_email": committer.email if committer else None,
+                        "committer_date": committer.date.isoformat() if committer and committer.date else None,
+                        "html_url": commit.html_url,
+                        "parents": [p.sha for p in commit.parents] # List of parent SHAs
+                    }
+                    bundle = Bundle.generate(rid=rid, contents=contents)
+                    logger.debug(f"Bundling backfill commit {rid}")
+                    node.processor.handle(bundle=bundle) 
+                    
+                    # Track the newest SHA processed in this run for this repo
+                    newest_sha_processed_in_repo = commit.sha 
+                    
+                except Exception as e:
+                    logger.error(f"Error processing commit {commit.sha} in {repo_full_name}: {e}", exc_info=True)
+
+            # Store the newest SHA processed for this repo during this run
+            if newest_sha_processed_in_repo:
+                newest_sha_processed_overall_map[repo_full_name] = newest_sha_processed_in_repo
+                logger.debug(f"Newest SHA processed for {repo_full_name} in this run: {newest_sha_processed_in_repo}")
+
+        except RateLimitExceededException:
+            logger.error(f"GitHub API rate limit exceeded while backfilling {repo_full_name}. Aborting backfill. Try again later or use a GITHUB_TOKEN.")
+            # Depending on requirements, could wait and retry, but for now, we stop.
+            return # Stop the entire backfill process
+        except GithubException as e:
+            logger.error(f"GitHub API error for repository {repo_full_name}: {e}. Skipping this repo.")
+            continue # Skip to the next repository
+        except Exception as e:
+            logger.error(f"Unexpected error backfilling repository {repo_full_name}: {e}", exc_info=True)
+            continue # Skip to the next repository
+
+    # After processing all repos, persist the newest SHAs found (if changed)
+    updated_count = 0
+    for repo_full_name, newest_sha in newest_sha_processed_overall_map.items():
+        if newest_sha != current_state.get(repo_full_name):
+            update_state_file(repo_full_name, newest_sha) # Call function from config.py
+            updated_count += 1
+        else:
+            logger.debug(f"No state update needed for {repo_full_name}, newest SHA {newest_sha} is same as stored.")
+            
+    if updated_count > 0:
+        logger.info(f"Backfill complete. Updated state for {updated_count} repositories.")
+    else:
+        logger.info(f"Backfill complete. No new commits found or state changes required across monitored repositories.")
+
+if __name__ == "__main__":
+    # Example of how to run backfill directly for testing
+    # Requires node to be started if handle() depends on active components
+    # In practice, this is called by server.py during startup
+    logging.basicConfig(level=logging.INFO)
+    logger.info("Running backfill directly for testing...")
+    # node.start() # Might be needed depending on node.processor.handle implementation
+    perform_backfill()
+    # node.stop()
+</file>
+
+<file path="node/config.py">
+import logging
+import json
+from pydantic_settings import BaseSettings
+from pydantic import Field
+from typing import Optional, List
+
+# Configure basic logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+class Settings(BaseSettings):
+    # --- KOI-net Configuration ---
+    URL: str = Field(..., description="Public URL where this Github node can be reached by other KOI-net nodes.")
+    FIRST_CONTACT: str = Field(..., description="URL of the coordinator node or another known KOI-net node.")
+
+    # --- Github Sensor Server Configuration ---
+    HOST: str = Field(default="127.0.0.1", description="Host the FastAPI server should listen on.")
+    PORT: int = Field(default=8001, description="Port the FastAPI server should listen on.")
+
+    # --- Github Configuration ---
+    GITHUB_TOKEN: Optional[str] = Field(default=None, description="Optional Github Personal Access Token.")
+    # Load MONITORED_REPOS from env var as a string
+    MONITORED_REPOS_STR: str = Field(alias="MONITORED_REPOS", default="", description="Comma-separated list of repositories (owner/repo).")
+    GITHUB_WEBHOOK_SECRET: str = Field(..., description="Secret used to verify webhook signatures.")
+
+    # --- State File ---
+    STATE_FILE_PATH: str = Field(default="state.json", description="Path to the JSON file storing the last processed commit SHA.")
+
+    # --- Logging Configuration ---
+    LOG_LEVEL: str = Field(default="INFO", description="Logging level (e.g., DEBUG, INFO, WARNING).")
+
+    @property
+    def MONITORED_REPOS(self) -> List[str]:
+        """Parses the comma-separated MONITORED_REPOS_STR into a list of 'owner/repo' strings."""
+        if not self.MONITORED_REPOS_STR:
+            return []
+        # Split by comma, strip whitespace, and filter out empty strings
+        repos = [repo.strip() for repo in self.MONITORED_REPOS_STR.split(',') if repo.strip()]
+        logger.debug(f"Parsed monitored repos: {repos}")
+        return repos
+
+    class Config:
+        env_file = 'services/github/.env'
+        env_file_encoding = 'utf-8'
+        extra = 'ignore'
+
+# Instantiate settings early to catch config errors on import
+try:
+    settings = Settings()
+    # Apply log level from settings
+    logging.getLogger().setLevel(settings.LOG_LEVEL.upper())
+    logger.info("Configuration loaded successfully.")
+    logger.info(f"Settings: {settings.model_dump(exclude={'GITHUB_TOKEN', 'GITHUB_WEBHOOK_SECRET'})}") # Exclude token and secret from debug logs
+except Exception as e:
+    logger.exception(f"Failed to load configuration from .env file: {e}")
+    # Optionally re-raise or exit if config is critical
+    raise
+
+# --- Exported Variables ---
+# Make settings easily accessible throughout the application
+URL = settings.URL
+FIRST_CONTACT = settings.FIRST_CONTACT
+HOST = settings.HOST
+PORT = settings.PORT
+GITHUB_TOKEN = settings.GITHUB_TOKEN
+GITHUB_WEBHOOK_SECRET = settings.GITHUB_WEBHOOK_SECRET
+MONITORED_REPOS = settings.MONITORED_REPOS # Access the parsed list via the property
+STATE_FILE_PATH = settings.STATE_FILE_PATH
+LOG_LEVEL = settings.LOG_LEVEL
+
+# --- State Management (Loading initial state & update function) ---
+LAST_PROCESSED_SHA = {} # Dictionary mapping repo_name -> last_sha
+
+def load_state():
+    """Loads the last processed SHA state from the JSON file."""
+    global LAST_PROCESSED_SHA
+    try:
+        with open(STATE_FILE_PATH, 'r') as f:
+            LAST_PROCESSED_SHA = json.load(f)
+        logger.info(f"Loaded state from '{STATE_FILE_PATH}': {list(LAST_PROCESSED_SHA.keys())}")
+    except FileNotFoundError:
+        logger.warning(f"State file '{STATE_FILE_PATH}' not found. Starting with empty state.")
+        LAST_PROCESSED_SHA = {}
+    except json.JSONDecodeError:
+        logger.error(f"Error decoding JSON from state file '{STATE_FILE_PATH}'. Starting with empty state.")
+        LAST_PROCESSED_SHA = {}
+    except Exception as e:
+        logger.error(f"Unexpected error loading state file '{STATE_FILE_PATH}': {e}", exc_info=True)
+        LAST_PROCESSED_SHA = {}
+
+def update_state_file(repo_name: str, last_sha: str):
+    """Updates the state file with the latest processed SHA for a repo."""
+    global LAST_PROCESSED_SHA
+    LAST_PROCESSED_SHA[repo_name] = last_sha
+    try:
+        # Create directory if it doesn't exist (though it should usually be just the filename)
+        # import os
+        # os.makedirs(os.path.dirname(STATE_FILE_PATH), exist_ok=True) # Uncomment if path can include dirs
+        with open(STATE_FILE_PATH, 'w') as f:
+            json.dump(LAST_PROCESSED_SHA, f, indent=4)
+        logger.debug(f"Updated state file '{STATE_FILE_PATH}' for {repo_name} with SHA: {last_sha}")
+    except IOError as e:
+        logger.error(f"Failed to write state file '{STATE_FILE_PATH}': {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error writing state file '{STATE_FILE_PATH}': {e}", exc_info=True)
+
+# Load initial state when config module is imported
+load_state()
+</file>
+
+<file path="node/core.py">
+import os
+import shutil
+import logging
+
+from koi_net import NodeInterface
+from koi_net.protocol.node import NodeProfile, NodeType, NodeProvides
+
+from .config import HOST, PORT, FIRST_CONTACT
+from .types import GithubCommit
+
+logger = logging.getLogger(__name__)
+
+name = "sensor"
+
+identity_dir = f".koi/{name}"
+cache_dir = f".koi/{name}/rid_cache_{name}"
+# Remove existing directories if they exist
+shutil.rmtree(identity_dir, ignore_errors=True)
+shutil.rmtree(cache_dir, ignore_errors=True)
+
+# Recreate the directories
+os.makedirs(identity_dir, exist_ok=True)
+os.makedirs(cache_dir, exist_ok=True)
+
+# Initialize the KOI-net Node Interface for the GitHub Sensor
+node = NodeInterface(
+    name=name,
+    profile=NodeProfile(
+        base_url=f"http://{HOST}:{PORT}/koi-net",
+        node_type=NodeType.FULL, # Assuming it provides data and potentially processes
+        provides=NodeProvides(
+            event=[GithubCommit], # Provides GithubCommit events
+            state=[GithubCommit]  # Can serve state for GithubCommit RIDs
+        )
+    ),
+    use_kobj_processor_thread=True, # Use a background thread for processing
+    first_contact=FIRST_CONTACT,   # Coordinator node to connect to initially
+    identity_file_path=f"{identity_dir}/{name}_identity.json", # Use the variable
+    event_queues_file_path=f"{identity_dir}/{name}_event_queues.json", # Use the variable
+    cache_directory_path=cache_dir # Use the variable
+)
+
+logger.info(f"Initialized NodeInterface: {node.identity.rid}")
+logger.info(f"Node attempting first contact with: {FIRST_CONTACT}")
+</file>
+
+<file path="node/loader.py">
+from .core import node
+from .handlers import github
+
+def register_handlers():
+    print("Registering GITHUB handlers...")
+    _ = github
+</file>
+
+<file path="node/server.py">
+import logging
+import asyncio
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, APIRouter, Request, Body, Header, HTTPException
+from koi_net.processor.knowledge_object import KnowledgeSource
+from koi_net.protocol.api_models import (
+    PollEvents,
+    FetchRids,
+    FetchManifests,
+    FetchBundles,
+    EventsPayload,
+    RidsPayload,
+    ManifestsPayload,
+    BundlesPayload
+)
+from koi_net.protocol.consts import (
+    BROADCAST_EVENTS_PATH,
+    POLL_EVENTS_PATH,
+    FETCH_RIDS_PATH,
+    FETCH_MANIFESTS_PATH,
+    FETCH_BUNDLES_PATH
+)
+from .core import node
+from .webhook import router as github_router
+from .backfill import perform_backfill
+from .loader import register_handlers
+
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage node startup, backfill, and shutdown."""
+    logger.info("Starting FastAPI application lifespan...")
+    # Start the KOI-net node
+    try:
+        register_handlers()
+        node.start()
+        logger.info("KOI-net node started successfully.")
+    except Exception as e:
+        logger.error(f"Failed to start KOI-net node: {e}", exc_info=True)
+        # Depending on requirements, you might want to prevent the app from starting
+        raise RuntimeError("Failed to initialize KOI-net node") from e
+
+    # Run initial backfill in the background
+    logger.info("Scheduling initial GitHub backfill...")
+    # Run backfill in a separate thread/task to avoid blocking startup
+    # Note: perform_backfill itself is synchronous, so asyncio.to_thread is suitable.
+    # If perform_backfill becomes async, just use asyncio.create_task directly.
+    backfill_task = asyncio.to_thread(perform_backfill)
+    # If you need to wait for backfill completion before yielding, await here.
+    # For now, let it run in the background.
+
+    try:
+        yield # Application runs here
+    finally:
+        # Cleanup: Cancel pending tasks, stop the node
+        logger.info("Shutting down FastAPI application...")
+        # Attempt to gracefully cancel the backfill if it's still running
+        # This might require more sophisticated task management if backfill is long-running
+        # if backfill_task and not backfill_task.done():
+        #     try:
+        #         backfill_task.cancel()
+        #         await backfill_task
+        #     except asyncio.CancelledError:
+        #         logger.info("Backfill task cancelled.")
+        #     except Exception as e:
+        #         logger.error(f"Error cancelling backfill task: {e}", exc_info=True)
+        
+        try:
+            node.stop()
+            logger.info("KOI-net node stopped successfully.")
+        except Exception as e:
+            logger.error(f"Error stopping KOI-net node: {e}", exc_info=True)
+        logger.info("FastAPI application shutdown complete.")
+
+# Create FastAPI app instance
+app = FastAPI(
+    title="KOI-net GitHub Sensor Node",
+    description="Listens for GitHub webhooks and performs backfill to ingest commit data.",
+    version="0.1.0",
+    lifespan=lifespan # Register the lifespan context manager
+)
+
+# Define KOI-net API router
+koi_net_router = APIRouter(prefix="/koi-net")
+
+@koi_net_router.post(BROADCAST_EVENTS_PATH)
+async def broadcast_events_endpoint(req: EventsPayload):
+    logger.info(f"Request to {BROADCAST_EVENTS_PATH}, received {len(req.events)} event(s)")
+    for event in req.events:
+        node.processor.handle(event=event, source=KnowledgeSource.External)
+    return {} # Broadcast endpoint typically returns empty success
+
+@koi_net_router.post(POLL_EVENTS_PATH)
+async def poll_events_endpoint(req: PollEvents) -> EventsPayload:
+    logger.info(f"Request to {POLL_EVENTS_PATH}")
+    events = node.network.flush_poll_queue(req.rid)
+    return EventsPayload(events=events)
+
+@koi_net_router.post(FETCH_RIDS_PATH)
+async def fetch_rids_endpoint(req: FetchRids) -> RidsPayload:
+    logger.info(f"Request to {FETCH_RIDS_PATH} for types {req.rid_types}")
+    # The default response_handler reads from cache, fulfilling the provides=[GithubCommit] state
+    return node.network.response_handler.fetch_rids(req)
+
+@koi_net_router.post(FETCH_MANIFESTS_PATH)
+async def fetch_manifests_endpoint(req: FetchManifests) -> ManifestsPayload:
+    logger.info(f"Request to {FETCH_MANIFESTS_PATH} for types {req.rid_types}, rids {req.rids}")
+    manifests_payload = node.network.response_handler.fetch_manifests(req)
+    # Add any custom logic here if you need to fetch manifests not in cache
+    return manifests_payload # The default handler already includes not_found
+
+@koi_net_router.post(FETCH_BUNDLES_PATH)
+async def fetch_bundles_endpoint(req: FetchBundles) -> BundlesPayload:
+    logger.info(f"Request to {FETCH_BUNDLES_PATH} for rids {req.rids}")
+    bundles_payload = node.network.response_handler.fetch_bundles(req)
+    # Add any custom logic here if you need to fetch bundles not in cache
+    return bundles_payload # The default handler already includes not_found and deferred
+
+# Include routers
+app.include_router(koi_net_router) # KOI-net API endpoints
+app.include_router(github_router) # GitHub webhook endpoint
+
+logger.info("FastAPI application configured with webhook and KOI-net routers.")
+
+# Note: This file defines the 'app'. It will be run by uvicorn via __main__.py
+</file>
+
+<file path="node/types.py">
+from rid_lib.core import ORN
+
+class GithubCommit(ORN):
+    """
+    Resource Identifier (RID) for a specific GitHub commit.
+    
+    Format: orn:github.commit:<owner>/<repo>/<sha>
+    Example: orn:github.commit:microsoft/vscode/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0
+    """
+    namespace = "github.commit"
+
+    def __init__(self, owner: str, repo: str, sha: str):
+        """
+        Initialize a GitHub commit RID.
+        
+        Args:
+            owner: The repository owner (user or organization)
+            repo: The repository name
+            sha: The commit SHA (full 40-character or shortened)
+        """
+        if not owner or not repo or not sha:
+            raise ValueError("Owner, repo, and SHA cannot be empty")
+        
+        if "/" in owner or "/" in repo:
+            raise ValueError("Owner and repo cannot contain '/' character")
+            
+        self.owner = owner
+        self.repo = repo
+        self.sha = sha
+
+    @property
+    def reference(self) -> str:
+        """Returns the reference part of the RID: '<owner>/<repo>/<sha>'."""
+        return f"{self.owner}/{self.repo}/{self.sha}"
+    
+    @property
+    def repository_full_name(self) -> str:
+        """Returns the full repository name: '<owner>/<repo>'."""
+        return f"{self.owner}/{self.repo}"
+    
+    @property
+    def html_url(self) -> str:
+        """Returns the HTML URL to view this commit on GitHub."""
+        return f"https://github.com/{self.owner}/{self.repo}/commit/{self.sha}"
+    
+    @property
+    def api_url(self) -> str:
+        """Returns the GitHub API URL for this commit."""
+        return f"https://api.github.com/repos/{self.owner}/{self.repo}/commits/{self.sha}"
+
+    @classmethod
+    def from_reference(cls, reference: str) -> "GithubCommit":
+        """
+        Creates a GithubCommit instance from its reference string.
+        
+        Args:
+            reference: String in format '<owner>/<repo>/<sha>'
+            
+        Returns:
+            GithubCommit instance
+            
+        Raises:
+            ValueError: If the reference format is invalid
+        """
+        try:
+            parts = reference.split("/", maxsplit=2)
+            if len(parts) != 3:
+                raise ValueError("Reference must contain exactly two '/' separators")
+                
+            owner, repo, sha = parts
+            
+            if not owner or not repo or not sha:
+                raise ValueError("Owner, repo, and SHA parts cannot be empty")
+                
+            # Basic SHA length check
+            if len(sha) < 7:  # Minimum length for a short SHA
+                raise ValueError(f"SHA part seems too short: {sha}")
+                
+            return cls(owner=owner, repo=repo, sha=sha)
+            
+        except ValueError as e:
+            raise ValueError(f"Invalid reference format for GithubCommit. Expected '<owner>/<repo>/<sha>', got '{reference}'. Error: {e}") from e
+        except Exception as e:
+            raise TypeError(f"Unexpected error parsing GithubCommit reference '{reference}': {e}") from e
+</file>
+
+<file path="node/webhook.py">
+import logging
+import hmac
+import hashlib
+from fastapi import APIRouter, Request, Header, HTTPException, Body
+from rid_lib.ext import Bundle
+# Assuming GithubCommit RID type is accessible
+from .types import GithubCommit
+from .core import node
+from .config import (
+    GITHUB_WEBHOOK_SECRET, MONITORED_REPOS,
+    update_state_file, LAST_PROCESSED_SHA 
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+async def verify_signature(request: Request, x_hub_signature_256: str = Header(None)):
+    """Verify the GitHub webhook signature."""
+    if not GITHUB_WEBHOOK_SECRET:
+        logger.warning("Webhook verification skipped: GITHUB_WEBHOOK_SECRET not set.")
+        return # Skip verification if secret is not configured
+
+    # This check is removed because FastAPI ensures the header is present
+    # if x_hub_signature_256 is None:
+    #     logger.error("Webhook verification failed: Missing X-Hub-Signature-256 header")
+    #     raise HTTPException(status_code=400, detail="Missing X-Hub-Signature-256 header")
+
+    body = await request.body()
+    hash_object = hmac.new(GITHUB_WEBHOOK_SECRET.encode('utf-8'), msg=body, digestmod=hashlib.sha256)
+    expected_signature = "sha256=" + hash_object.hexdigest()
+
+    if not hmac.compare_digest(expected_signature, x_hub_signature_256):
+        logger.error(f"Webhook verification failed: Invalid signature. Expected: {expected_signature}, Got: {x_hub_signature_256}")
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    logger.debug("Webhook signature verified successfully.")
+
+
+@router.post("/github/webhook", status_code=202) # Use 202 Accepted as we process async
+async def github_webhook(
+    request: Request,
+    x_github_event: str = Header(...), # Required header
+    x_hub_signature_256: str = Header(...), # Required for verification
+    payload: dict = Body(...)
+):
+    """Handle incoming GitHub webhook events (specifically 'push')."""
+    logger.info(f"Received GitHub webhook event: {x_github_event}")
+
+    try: # Main try block for the entire function
+        # --- Signature Verification --- 
+        await verify_signature(request, x_hub_signature_256)
+
+        # --- Event Handling --- 
+        if x_github_event == "ping":
+            logger.info("Received 'ping' event from GitHub. Responding OK.")
+            return {"message": "Pong!"}
+
+        if x_github_event != "push":
+            logger.debug(f"Ignoring non-'push' event: {x_github_event}")
+            return {"message": f"Ignoring event type: {x_github_event}"} 
+
+        # --- Process 'push' Event --- 
+        repo_info = payload.get("repository", {})
+        repo_full_name = repo_info.get("full_name")
+        repo_owner = repo_info.get("owner", {}).get("login") or repo_info.get("owner", {}).get("name")
+        repo_name = repo_info.get("name")
+        commits = payload.get("commits", [])
+        head_commit = payload.get("head_commit", {})
+
+        if not repo_full_name or not repo_owner or not repo_name:
+            logger.error(f"Webhook payload missing repository details: {payload.get('repository')}")
+            raise HTTPException(status_code=400, detail="Missing repository information in payload")
+            
+        # Check if the repository is monitored
+        if repo_full_name not in MONITORED_REPOS:
+            logger.debug(f"Ignoring push event for non-monitored repository: {repo_full_name}")
+            return {"message": f"Repository {repo_full_name} not monitored"}
+
+        if not commits and not head_commit:
+             logger.warning(f"'push' event for {repo_full_name} received without 'commits' or 'head_commit' data. Possibly a branch deletion or tag push? Payload head: {payload.get('ref', '')}")
+             return {"message": "No commit data found in push event"}
+
+        # Determine the commit(s) to process and the SHA to potentially update state with
+        commits_to_process = []
+        sha_to_update_state = None
+        
+        head_commit_id = head_commit.get('id')
+        if head_commit_id:
+            commits_to_process = [head_commit] # Use head_commit as the primary source
+            sha_to_update_state = head_commit_id # This is the SHA representing the push tip
+            logger.debug(f"Processing head_commit: {head_commit_id}")
+        elif commits:
+            commits_to_process = commits # Fallback to commits list
+            # If using commits list, the last commit's SHA is the best candidate for state update
+            if commits:
+                sha_to_update_state = commits[-1].get('id') 
+            logger.debug(f"Processing commits list (count: {len(commits)}). Potential state update SHA: {sha_to_update_state}")
+        else:
+             # This case should ideally not be reached due to the check above, but included for completeness
+             logger.warning(f"No processable commit data found in push event for {repo_full_name}. Skipping.")
+             return {"message": "No processable commit data"}
+
+        processed_new_commit = False
+        for commit in commits_to_process:
+            commit_sha = commit.get("id")
+            if not commit_sha:
+                logger.warning("Skipping commit in payload with missing 'id'.")
+                continue
+            
+            # Avoid reprocessing the last known SHA for this repo
+            last_known_sha_for_repo = LAST_PROCESSED_SHA.get(repo_full_name)
+            if last_known_sha_for_repo and commit_sha == last_known_sha_for_repo:
+                logger.debug(f"Skipping commit {commit_sha} for {repo_full_name} as it matches last known SHA {last_known_sha_for_repo}.")
+                continue
+
+            # Inner try-except for processing individual commits within the push
+            try:
+                # Construct RID
+                rid = GithubCommit(owner=repo_owner, repo=repo_name, sha=commit_sha)
+                
+                # Extract details - ensure keys exist
+                author = commit.get("author", {})
+                committer = commit.get("committer", {})
+                
+                contents = {
+                    "sha": commit_sha,
+                    "message": commit.get("message"),
+                    "author_name": author.get("name"),
+                    "author_email": author.get("email"),
+                    "author_date": commit.get("timestamp"), # GitHub often uses 'timestamp'
+                    "committer_name": committer.get("name"),
+                    "committer_email": committer.get("email"),
+                    "committer_date": committer.get("timestamp"),
+                    "html_url": commit.get("url"), # Use 'url' from webhook payload
+                    "parents": commit.get("parents", []) # Typically a list of SHAs in webhook
+                }
+                
+                bundle = Bundle.generate(rid=rid, contents=contents)
+                logger.debug(f"Bundling webhook commit {rid}")
+                node.processor.handle(bundle=bundle)
+                
+                processed_new_commit = True # Mark that we processed at least one new commit
+            
+            except Exception as e:
+                 logger.error(f"Error processing webhook commit {commit_sha} for {repo_full_name}: {e}", exc_info=True)
+                 # Decide whether to continue processing other commits in the push or stop
+                 continue # Continue with next commit in the webhook push
+        
+        # Update state file only if we processed a new commit and have a valid SHA representing the push tip
+        if processed_new_commit and sha_to_update_state:
+            # Check again if the sha_to_update is different from the stored one before writing
+            last_known_sha_for_repo = LAST_PROCESSED_SHA.get(repo_full_name)
+            if sha_to_update_state != last_known_sha_for_repo:
+                logger.info(f"Webhook processing complete for {repo_full_name}. Updating state to SHA: {sha_to_update_state}")
+                update_state_file(repo_full_name, sha_to_update_state) 
+            else:
+                 logger.info(f"Webhook processing complete for {repo_full_name}. State SHA {sha_to_update_state} already stored.")
+        elif processed_new_commit:
+             logger.warning(f"Webhook processing complete for {repo_full_name}. Processed new commit(s) but could not determine SHA for state update.")
+        else:
+             logger.info(f"Webhook processing complete for {repo_full_name}. No new commits processed or state updated.")
+
+        return {"message": "Webhook processed successfully"}
+
+    # Exception handlers are now correctly indented relative to the main 'try' block
+    except HTTPException as he:
+        # Re-raise HTTP exceptions to return proper status codes
+        logger.warning(f"HTTP Exception during webhook processing: {he.detail}")
+        raise he
+    except Exception as e:
+        logger.error(f"Unexpected error handling webhook event {x_github_event}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error handling webhook")
+</file>
+
+<file path=".gitignore">
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+</file>
+
+<file path="github-node.service">
+[Unit]
+Description=KOI-net Github Node Service
+After=network.target
+
+[Service]
+WorkingDirectory=/Users/sayertindall/Documents/GitHub/block.science/koinets/koi-github-node/services/github
+ExecStart=/Users/sayertindall/Documents/GitHub/block.science/koinets/koi-github-node/.venv/bin/python3 -m node
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+</file>
+
+<file path="pyproject.toml">
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "github"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "httpx",
+    "python-dotenv",
+    "rid-lib>=3.2.3",
+    "koi-net",
+    "PyGithub",
+    "aiohttp",
+    "rich" # Added for logging
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+</file>
+
+</files>
+
+
+
+================================================
+FILE: services/github/.env.example
+================================================
+
+# KOI-net GitHub Node Configuration
+
+# Public URL where this GitHub node can be reached by other KOI-net nodes
+URL="http://127.0.0.1:8001"
+
+# URL of the coordinator node or another known KOI-net node
+FIRST_CONTACT="http://127.0.0.1:8000/koi-net"
+
+# Host the FastAPI server should listen on (0.0.0.0 allows external connections)
+HOST="0.0.0.0"
+
+# Port the FastAPI server should listen on
+PORT="8001"
+
+# GitHub Personal Access Token (replace with your own token)
+GITHUB_TOKEN="your_github_token_here"
+
+# Secret used to verify webhook signatures (generate a secure random string)
+GITHUB_WEBHOOK_SECRET="your_webhook_secret_here"
+
+# Comma-separated list of repositories to monitor (format: owner/repo)
+MONITORED_REPOS="owner/repo1,owner/repo2"
+
+# Path to the JSON file storing the last processed commit SHA
+STATE_FILE_PATH="state.json"
+
+# Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+# LOG_LEVEL="INFO"
+
+
+================================================
+FILE: services/github/.gitignore
+================================================
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+
+================================================
+FILE: services/github/node/__init__.py
+================================================
+import logging
+from rich.logging import RichHandler
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[RichHandler()]
+)
+
+
+
+
+================================================
+FILE: services/github/node/__main__.py
+================================================
+import uvicorn
+import logging
+from .config import HOST, PORT
+
+logger = logging.getLogger(__name__)
+
+logger.info(f"GitHub sensor node starting on {HOST}:{PORT}")
+uvicorn.run("services.github.node.server:app", host=HOST, port=PORT, log_config=None, reload=True)
+
+
+================================================
+FILE: services/github/node/backfill.py
+================================================
+import logging
+from github import Github, GithubException, RateLimitExceededException
+from github.Commit import Commit
+from rid_lib.ext import Bundle
+# Assuming GithubCommit RID type is accessible
+from .types import GithubCommit 
+from .core import node
+from .config import (
+    GITHUB_TOKEN, MONITORED_REPOS,
+    LAST_PROCESSED_SHA, update_state_file 
+)
+
+logger = logging.getLogger(__name__)
+
+# Initialize GitHub client (authenticated if token provided)
+github_client = Github(GITHUB_TOKEN) if GITHUB_TOKEN else Github()
+logger.info(f"GitHub client initialized. Authenticated: {bool(GITHUB_TOKEN)}")
+
+def perform_backfill():
+    """
+    One-time startup backfill: fetch all commits since LAST_PROCESSED_SHA
+    for each monitored repo, bundle them as NEW, and persist the latest SHA processed.
+    Processes commits oldest-to-newest after fetching.
+    """
+    logger.info("Starting GitHub backfill process...")
+    
+    # Load the state dictionary once before the loop
+    current_state = LAST_PROCESSED_SHA.copy() # Use a copy to avoid modifying during iteration if needed
+    newest_sha_processed_overall_map = {} # Track newest SHA per repo processed in this run
+
+    if not MONITORED_REPOS:
+        logger.warning("No repositories configured in MONITORED_REPOS. Backfill skipped.")
+        return
+
+    for repo_full_name in MONITORED_REPOS:
+        try:
+            owner, repo_name_only = repo_full_name.split('/')
+            # Get the last processed SHA for *this specific repository*
+            last_sha_for_repo = current_state.get(repo_full_name)
+            logger.info(f"Backfilling repository: {repo_full_name} since SHA: {last_sha_for_repo or 'beginning'}")
+
+            gh_repo = github_client.get_repo(repo_full_name)
+            commits_to_process_buffer: list[Commit] = []
+            
+            # Iterate commits newest-first until we find the last processed one
+            paginated_commits = gh_repo.get_commits()
+            logger.debug(f"Fetching commits for {repo_full_name}...")
+            commit_count = 0
+            for commit in paginated_commits:
+                commit_count += 1
+                # Check against the specific SHA for this repo
+                if last_sha_for_repo and commit.sha == last_sha_for_repo:
+                    logger.info(f"Found last processed SHA {last_sha_for_repo} in {repo_full_name}. Stopping fetch for this repo.")
+                    break
+                commits_to_process_buffer.append(commit)
+                # Safety break for potentially huge repos without a known SHA
+                # Adjust limit as needed
+                if commit_count % 100 == 0:
+                    logger.debug(f"Fetched {commit_count} commits for {repo_full_name} so far...")
+                # if commit_count > 1000: 
+                #    logger.warning(f"Reached fetch limit (1000) for {repo_full_name}. Consider adjusting.")
+                #    break 
+            
+            logger.info(f"Found {len(commits_to_process_buffer)} new commits in {repo_full_name} to backfill.")
+
+            # Process commits oldest → newest
+            newest_sha_processed_in_repo = None
+            for commit in reversed(commits_to_process_buffer):
+                try:
+                    rid = GithubCommit(owner=owner, repo=repo_name_only, sha=commit.sha)
+                    # Extract commit details carefully, handling potential missing attributes
+                    author = commit.commit.author
+                    committer = commit.commit.committer
+                    
+                    contents = {
+                        "sha": commit.sha,
+                        "message": commit.commit.message,
+                        "author_name": author.name if author else None,
+                        "author_email": author.email if author else None,
+                        "author_date": author.date.isoformat() if author and author.date else None,
+                        "committer_name": committer.name if committer else None,
+                        "committer_email": committer.email if committer else None,
+                        "committer_date": committer.date.isoformat() if committer and committer.date else None,
+                        "html_url": commit.html_url,
+                        "parents": [p.sha for p in commit.parents] # List of parent SHAs
+                    }
+                    bundle = Bundle.generate(rid=rid, contents=contents)
+                    logger.debug(f"Bundling backfill commit {rid}")
+                    node.processor.handle(bundle=bundle) 
+                    
+                    # Track the newest SHA processed in this run for this repo
+                    newest_sha_processed_in_repo = commit.sha 
+                    
+                except Exception as e:
+                    logger.error(f"Error processing commit {commit.sha} in {repo_full_name}: {e}", exc_info=True)
+
+            # Store the newest SHA processed for this repo during this run
+            if newest_sha_processed_in_repo:
+                newest_sha_processed_overall_map[repo_full_name] = newest_sha_processed_in_repo
+                logger.debug(f"Newest SHA processed for {repo_full_name} in this run: {newest_sha_processed_in_repo}")
+
+        except RateLimitExceededException:
+            logger.error(f"GitHub API rate limit exceeded while backfilling {repo_full_name}. Aborting backfill. Try again later or use a GITHUB_TOKEN.")
+            # Depending on requirements, could wait and retry, but for now, we stop.
+            return # Stop the entire backfill process
+        except GithubException as e:
+            logger.error(f"GitHub API error for repository {repo_full_name}: {e}. Skipping this repo.")
+            continue # Skip to the next repository
+        except Exception as e:
+            logger.error(f"Unexpected error backfilling repository {repo_full_name}: {e}", exc_info=True)
+            continue # Skip to the next repository
+
+    # After processing all repos, persist the newest SHAs found (if changed)
+    updated_count = 0
+    for repo_full_name, newest_sha in newest_sha_processed_overall_map.items():
+        if newest_sha != current_state.get(repo_full_name):
+            update_state_file(repo_full_name, newest_sha) # Call function from config.py
+            updated_count += 1
+        else:
+            logger.debug(f"No state update needed for {repo_full_name}, newest SHA {newest_sha} is same as stored.")
+            
+    if updated_count > 0:
+        logger.info(f"Backfill complete. Updated state for {updated_count} repositories.")
+    else:
+        logger.info(f"Backfill complete. No new commits found or state changes required across monitored repositories.")
+
+if __name__ == "__main__":
+    # Example of how to run backfill directly for testing
+    # Requires node to be started if handle() depends on active components
+    # In practice, this is called by server.py during startup
+    logging.basicConfig(level=logging.INFO)
+    logger.info("Running backfill directly for testing...")
+    # node.start() # Might be needed depending on node.processor.handle implementation
+    perform_backfill()
+    # node.stop() 
+
+
+
+================================================
+FILE: services/github/node/config.py
+================================================
+import logging
+import json
+from pydantic_settings import BaseSettings
+from pydantic import Field
+from typing import Optional, List
+
+# Configure basic logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+class Settings(BaseSettings):
+    # --- KOI-net Configuration ---
+    URL: str = Field(..., description="Public URL where this Github node can be reached by other KOI-net nodes.")
+    FIRST_CONTACT: str = Field(..., description="URL of the coordinator node or another known KOI-net node.")
+
+    # --- Github Sensor Server Configuration ---
+    HOST: str = Field(default="127.0.0.1", description="Host the FastAPI server should listen on.")
+    PORT: int = Field(default=8001, description="Port the FastAPI server should listen on.")
+
+    # --- Github Configuration ---
+    GITHUB_TOKEN: Optional[str] = Field(default=None, description="Optional Github Personal Access Token.")
+    # Load MONITORED_REPOS from env var as a string
+    MONITORED_REPOS_STR: str = Field(alias="MONITORED_REPOS", default="", description="Comma-separated list of repositories (owner/repo).")
+    GITHUB_WEBHOOK_SECRET: str = Field(..., description="Secret used to verify webhook signatures.")
+
+    # --- State File ---
+    STATE_FILE_PATH: str = Field(default="state.json", description="Path to the JSON file storing the last processed commit SHA.")
+
+    # --- Logging Configuration ---
+    LOG_LEVEL: str = Field(default="INFO", description="Logging level (e.g., DEBUG, INFO, WARNING).")
+
+    @property
+    def MONITORED_REPOS(self) -> List[str]:
+        """Parses the comma-separated MONITORED_REPOS_STR into a list of 'owner/repo' strings."""
+        if not self.MONITORED_REPOS_STR:
+            return []
+        # Split by comma, strip whitespace, and filter out empty strings
+        repos = [repo.strip() for repo in self.MONITORED_REPOS_STR.split(',') if repo.strip()]
+        logger.debug(f"Parsed monitored repos: {repos}")
+        return repos
+
+    class Config:
+        env_file = 'services/github/.env'
+        env_file_encoding = 'utf-8'
+        extra = 'ignore'
+
+# Instantiate settings early to catch config errors on import
+try:
+    settings = Settings()
+    # Apply log level from settings
+    logging.getLogger().setLevel(settings.LOG_LEVEL.upper())
+    logger.info("Configuration loaded successfully.")
+    logger.info(f"Settings: {settings.model_dump(exclude={'GITHUB_TOKEN', 'GITHUB_WEBHOOK_SECRET'})}") # Exclude token and secret from debug logs
+except Exception as e:
+    logger.exception(f"Failed to load configuration from .env file: {e}")
+    # Optionally re-raise or exit if config is critical
+    raise
+
+# --- Exported Variables ---
+# Make settings easily accessible throughout the application
+URL = settings.URL
+FIRST_CONTACT = settings.FIRST_CONTACT
+HOST = settings.HOST
+PORT = settings.PORT
+GITHUB_TOKEN = settings.GITHUB_TOKEN
+GITHUB_WEBHOOK_SECRET = settings.GITHUB_WEBHOOK_SECRET
+MONITORED_REPOS = settings.MONITORED_REPOS # Access the parsed list via the property
+STATE_FILE_PATH = settings.STATE_FILE_PATH
+LOG_LEVEL = settings.LOG_LEVEL
+
+# --- State Management (Loading initial state & update function) ---
+LAST_PROCESSED_SHA = {} # Dictionary mapping repo_name -> last_sha
+
+def load_state():
+    """Loads the last processed SHA state from the JSON file."""
+    global LAST_PROCESSED_SHA
+    try:
+        with open(STATE_FILE_PATH, 'r') as f:
+            LAST_PROCESSED_SHA = json.load(f)
+        logger.info(f"Loaded state from '{STATE_FILE_PATH}': {list(LAST_PROCESSED_SHA.keys())}")
+    except FileNotFoundError:
+        logger.warning(f"State file '{STATE_FILE_PATH}' not found. Starting with empty state.")
+        LAST_PROCESSED_SHA = {}
+    except json.JSONDecodeError:
+        logger.error(f"Error decoding JSON from state file '{STATE_FILE_PATH}'. Starting with empty state.")
+        LAST_PROCESSED_SHA = {}
+    except Exception as e:
+        logger.error(f"Unexpected error loading state file '{STATE_FILE_PATH}': {e}", exc_info=True)
+        LAST_PROCESSED_SHA = {}
+
+def update_state_file(repo_name: str, last_sha: str):
+    """Updates the state file with the latest processed SHA for a repo."""
+    global LAST_PROCESSED_SHA
+    LAST_PROCESSED_SHA[repo_name] = last_sha
+    try:
+        # Create directory if it doesn't exist (though it should usually be just the filename)
+        # import os
+        # os.makedirs(os.path.dirname(STATE_FILE_PATH), exist_ok=True) # Uncomment if path can include dirs
+        with open(STATE_FILE_PATH, 'w') as f:
+            json.dump(LAST_PROCESSED_SHA, f, indent=4)
+        logger.debug(f"Updated state file '{STATE_FILE_PATH}' for {repo_name} with SHA: {last_sha}")
+    except IOError as e:
+        logger.error(f"Failed to write state file '{STATE_FILE_PATH}': {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error writing state file '{STATE_FILE_PATH}': {e}", exc_info=True)
+
+# Load initial state when config module is imported
+load_state()
+
+
+
+================================================
+FILE: services/github/node/core.py
+================================================
+import os
+import shutil
+import logging
+
+from koi_net import NodeInterface
+from koi_net.protocol.node import NodeProfile, NodeType, NodeProvides
+
+from .config import HOST, PORT, FIRST_CONTACT
+from .types import GithubCommit
+
+logger = logging.getLogger(__name__)
+
+name = "sensor"
+
+identity_dir = f".koi/{name}"
+cache_dir = f".koi/{name}/rid_cache_{name}"
+# Remove existing directories if they exist
+shutil.rmtree(identity_dir, ignore_errors=True)
+shutil.rmtree(cache_dir, ignore_errors=True)
+
+# Recreate the directories
+os.makedirs(identity_dir, exist_ok=True)
+os.makedirs(cache_dir, exist_ok=True)
+
+# Initialize the KOI-net Node Interface for the GitHub Sensor
+node = NodeInterface(
+    name=name,
+    profile=NodeProfile(
+        base_url=f"http://{HOST}:{PORT}/koi-net",
+        node_type=NodeType.FULL, # Assuming it provides data and potentially processes
+        provides=NodeProvides(
+            event=[GithubCommit], # Provides GithubCommit events
+            state=[GithubCommit]  # Can serve state for GithubCommit RIDs
+        )
+    ),
+    use_kobj_processor_thread=True, # Use a background thread for processing
+    first_contact=FIRST_CONTACT,   # Coordinator node to connect to initially
+    identity_file_path=f"{identity_dir}/{name}_identity.json", # Use the variable
+    event_queues_file_path=f"{identity_dir}/{name}_event_queues.json", # Use the variable
+    cache_directory_path=cache_dir # Use the variable
+)
+
+logger.info(f"Initialized NodeInterface: {node.identity.rid}")
+logger.info(f"Node attempting first contact with: {FIRST_CONTACT}")
+
+
+
+================================================
+FILE: services/github/node/loader.py
+================================================
+from .core import node
+from .handlers import github
+
+def register_handlers():
+    print("Registering GITHUB handlers...")
+    _ = github
+
+
+================================================
+FILE: services/github/node/server.py
+================================================
+import logging
+import asyncio
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, APIRouter, Request, Body, Header, HTTPException
+from koi_net.processor.knowledge_object import KnowledgeSource
+from koi_net.protocol.api_models import (
+    PollEvents,
+    FetchRids,
+    FetchManifests,
+    FetchBundles,
+    EventsPayload,
+    RidsPayload,
+    ManifestsPayload,
+    BundlesPayload
+)
+from koi_net.protocol.consts import (
+    BROADCAST_EVENTS_PATH,
+    POLL_EVENTS_PATH,
+    FETCH_RIDS_PATH,
+    FETCH_MANIFESTS_PATH,
+    FETCH_BUNDLES_PATH
+)
+from .core import node
+from .webhook import router as github_router
+from .backfill import perform_backfill
+from .loader import register_handlers
+
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage node startup, backfill, and shutdown."""
+    logger.info("Starting FastAPI application lifespan...")
+    # Start the KOI-net node
+    try:
+        register_handlers()
+        node.start()
+        logger.info("KOI-net node started successfully.")
+    except Exception as e:
+        logger.error(f"Failed to start KOI-net node: {e}", exc_info=True)
+        # Depending on requirements, you might want to prevent the app from starting
+        raise RuntimeError("Failed to initialize KOI-net node") from e
+
+    # Run initial backfill in the background
+    logger.info("Scheduling initial GitHub backfill...")
+    # Run backfill in a separate thread/task to avoid blocking startup
+    # Note: perform_backfill itself is synchronous, so asyncio.to_thread is suitable.
+    # If perform_backfill becomes async, just use asyncio.create_task directly.
+    backfill_task = asyncio.to_thread(perform_backfill)
+    # If you need to wait for backfill completion before yielding, await here.
+    # For now, let it run in the background.
+
+    try:
+        yield # Application runs here
+    finally:
+        # Cleanup: Cancel pending tasks, stop the node
+        logger.info("Shutting down FastAPI application...")
+        # Attempt to gracefully cancel the backfill if it's still running
+        # This might require more sophisticated task management if backfill is long-running
+        # if backfill_task and not backfill_task.done():
+        #     try:
+        #         backfill_task.cancel()
+        #         await backfill_task
+        #     except asyncio.CancelledError:
+        #         logger.info("Backfill task cancelled.")
+        #     except Exception as e:
+        #         logger.error(f"Error cancelling backfill task: {e}", exc_info=True)
+        
+        try:
+            node.stop()
+            logger.info("KOI-net node stopped successfully.")
+        except Exception as e:
+            logger.error(f"Error stopping KOI-net node: {e}", exc_info=True)
+        logger.info("FastAPI application shutdown complete.")
+
+# Create FastAPI app instance
+app = FastAPI(
+    title="KOI-net GitHub Sensor Node",
+    description="Listens for GitHub webhooks and performs backfill to ingest commit data.",
+    version="0.1.0",
+    lifespan=lifespan # Register the lifespan context manager
+)
+
+# Define KOI-net API router
+koi_net_router = APIRouter(prefix="/koi-net")
+
+@koi_net_router.post(BROADCAST_EVENTS_PATH)
+async def broadcast_events_endpoint(req: EventsPayload):
+    logger.info(f"Request to {BROADCAST_EVENTS_PATH}, received {len(req.events)} event(s)")
+    for event in req.events:
+        node.processor.handle(event=event, source=KnowledgeSource.External)
+    return {} # Broadcast endpoint typically returns empty success
+
+@koi_net_router.post(POLL_EVENTS_PATH)
+async def poll_events_endpoint(req: PollEvents) -> EventsPayload:
+    logger.info(f"Request to {POLL_EVENTS_PATH}")
+    events = node.network.flush_poll_queue(req.rid)
+    return EventsPayload(events=events)
+
+@koi_net_router.post(FETCH_RIDS_PATH)
+async def fetch_rids_endpoint(req: FetchRids) -> RidsPayload:
+    logger.info(f"Request to {FETCH_RIDS_PATH} for types {req.rid_types}")
+    # The default response_handler reads from cache, fulfilling the provides=[GithubCommit] state
+    return node.network.response_handler.fetch_rids(req)
+
+@koi_net_router.post(FETCH_MANIFESTS_PATH)
+async def fetch_manifests_endpoint(req: FetchManifests) -> ManifestsPayload:
+    logger.info(f"Request to {FETCH_MANIFESTS_PATH} for types {req.rid_types}, rids {req.rids}")
+    manifests_payload = node.network.response_handler.fetch_manifests(req)
+    # Add any custom logic here if you need to fetch manifests not in cache
+    return manifests_payload # The default handler already includes not_found
+
+@koi_net_router.post(FETCH_BUNDLES_PATH)
+async def fetch_bundles_endpoint(req: FetchBundles) -> BundlesPayload:
+    logger.info(f"Request to {FETCH_BUNDLES_PATH} for rids {req.rids}")
+    bundles_payload = node.network.response_handler.fetch_bundles(req)
+    # Add any custom logic here if you need to fetch bundles not in cache
+    return bundles_payload # The default handler already includes not_found and deferred
+
+# Include routers
+app.include_router(koi_net_router) # KOI-net API endpoints
+app.include_router(github_router) # GitHub webhook endpoint
+
+logger.info("FastAPI application configured with webhook and KOI-net routers.")
+
+
+
+================================================
+FILE: services/github/node/types.py
+================================================
+from rid_lib.core import ORN
+
+class GithubCommit(ORN):
+    """
+    Resource Identifier (RID) for a specific GitHub commit.
+    
+    Format: orn:github.commit:<owner>/<repo>/<sha>
+    Example: orn:github.commit:microsoft/vscode/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0
+    """
+    namespace = "github.commit"
+
+    def __init__(self, owner: str, repo: str, sha: str):
+        """
+        Initialize a GitHub commit RID.
+        
+        Args:
+            owner: The repository owner (user or organization)
+            repo: The repository name
+            sha: The commit SHA (full 40-character or shortened)
+        """
+        if not owner or not repo or not sha:
+            raise ValueError("Owner, repo, and SHA cannot be empty")
+        
+        if "/" in owner or "/" in repo:
+            raise ValueError("Owner and repo cannot contain '/' character")
+            
+        self.owner = owner
+        self.repo = repo
+        self.sha = sha
+
+    @property
+    def reference(self) -> str:
+        """Returns the reference part of the RID: '<owner>/<repo>/<sha>'."""
+        return f"{self.owner}/{self.repo}/{self.sha}"
+    
+    @property
+    def repository_full_name(self) -> str:
+        """Returns the full repository name: '<owner>/<repo>'."""
+        return f"{self.owner}/{self.repo}"
+    
+    @property
+    def html_url(self) -> str:
+        """Returns the HTML URL to view this commit on GitHub."""
+        return f"https://github.com/{self.owner}/{self.repo}/commit/{self.sha}"
+    
+    @property
+    def api_url(self) -> str:
+        """Returns the GitHub API URL for this commit."""
+        return f"https://api.github.com/repos/{self.owner}/{self.repo}/commits/{self.sha}"
+
+    @classmethod
+    def from_reference(cls, reference: str) -> "GithubCommit":
+        """
+        Creates a GithubCommit instance from its reference string.
+        
+        Args:
+            reference: String in format '<owner>/<repo>/<sha>'
+            
+        Returns:
+            GithubCommit instance
+            
+        Raises:
+            ValueError: If the reference format is invalid
+        """
+        try:
+            parts = reference.split("/", maxsplit=2)
+            if len(parts) != 3:
+                raise ValueError("Reference must contain exactly two '/' separators")
+                
+            owner, repo, sha = parts
+            
+            if not owner or not repo or not sha:
+                raise ValueError("Owner, repo, and SHA parts cannot be empty")
+                
+            # Basic SHA length check
+            if len(sha) < 7:  # Minimum length for a short SHA
+                raise ValueError(f"SHA part seems too short: {sha}")
+                
+            return cls(owner=owner, repo=repo, sha=sha)
+            
+        except ValueError as e:
+            raise ValueError(f"Invalid reference format for GithubCommit. Expected '<owner>/<repo>/<sha>', got '{reference}'. Error: {e}") from e
+        except Exception as e:
+            raise TypeError(f"Unexpected error parsing GithubCommit reference '{reference}': {e}") from e
+
+
+
+================================================
+FILE: services/github/node/webhook.py
+================================================
+import logging
+import hmac
+import hashlib
+import json
+from fastapi import APIRouter, Request, Header, HTTPException, Body
+from rid_lib.ext import Bundle
+from .types import GithubCommit
+from .core import node
+from .config import (
+    GITHUB_WEBHOOK_SECRET, MONITORED_REPOS,
+    update_state_file, LAST_PROCESSED_SHA 
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+async def verify_signature(request: Request, x_hub_signature_256: str = Header(None)):
+    """Verify the GitHub webhook signature."""
+    if not GITHUB_WEBHOOK_SECRET:
+        logger.warning("Webhook verification skipped: GITHUB_WEBHOOK_SECRET not set.")
+        return # Skip verification if secret is not configured
+
+    # This check is removed because FastAPI ensures the header is present
+    # if x_hub_signature_256 is None:
+    #     logger.error("Webhook verification failed: Missing X-Hub-Signature-256 header")
+    #     raise HTTPException(status_code=400, detail="Missing X-Hub-Signature-256 header")
+
+    body = await request.body()
+    hash_object = hmac.new(GITHUB_WEBHOOK_SECRET.encode('utf-8'), msg=body, digestmod=hashlib.sha256)
+    expected_signature = "sha256=" + hash_object.hexdigest()
+
+    if not hmac.compare_digest(expected_signature, x_hub_signature_256):
+        logger.error(f"Webhook verification failed: Invalid signature. Expected: {expected_signature}, Got: {x_hub_signature_256}")
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    logger.debug("Webhook signature verified successfully.")
+
+
+@router.post("/github/webhook", status_code=202)  # Use 202 Accepted as we process async
+async def github_webhook(
+    request: Request,
+    x_github_event: str = Header(...),  # Required header
+    x_hub_signature_256: str = Header(...)  # Required for verification
+):
+    """Handle incoming GitHub webhook events (specifically 'push')."""
+    logger.info(f"Received GitHub webhook event: {x_github_event}")
+
+    try:
+        # --- Signature Verification (Optional) ---
+        # await verify_signature(request, x_hub_signature_256)
+
+        # --- Parse JSON Payload ---
+        raw_body = await request.body()
+        try:
+            payload = json.loads(raw_body)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON in GitHub webhook payload")
+            raise HTTPException(status_code=400, detail="Invalid JSON")
+
+        # --- Event Handling ---
+        if x_github_event == "ping":
+            logger.info("Received 'ping' event from GitHub. Responding OK.")
+            return {"message": "Pong!"}
+
+        if x_github_event != "push":
+            logger.debug(f"Ignoring non-'push' event: {x_github_event}")
+            return {"message": f"Ignoring event type: {x_github_event}"}
+
+        logger.info(f"Processing 'push' event: {payload}")
+
+        # --- Process 'push' Event ---
+        repo_info = payload.get("repository", {})
+        repo_full_name = repo_info.get("full_name")
+        repo_owner = repo_info.get("owner", {}).get("login") or repo_info.get("owner", {}).get("name")
+        repo_name = repo_info.get("name")
+        commits = payload.get("commits", [])
+        head_commit = payload.get("head_commit", {})
+
+        if not repo_full_name or not repo_owner or not repo_name:
+            logger.error(f"Webhook payload missing repository details: {repo_info}")
+            raise HTTPException(status_code=400, detail="Missing repository information in payload")
+            
+        # Check if the repository is monitored
+        if repo_full_name not in MONITORED_REPOS:
+            logger.debug(f"Ignoring push event for non-monitored repository: {repo_full_name}")
+            return {"message": f"Repository {repo_full_name} not monitored"}
+
+        if not commits and not head_commit:
+             logger.warning(f"'push' event for {repo_full_name} received without 'commits' or 'head_commit' data. Possibly a branch deletion or tag push? Payload head: {payload.get('ref', '')}")
+             return {"message": "No commit data found in push event"}
+
+        # Determine the commit(s) to process and the SHA to potentially update state with
+        commits_to_process = []
+        sha_to_update_state = None
+        
+        head_commit_id = head_commit.get('id')
+        if head_commit_id:
+            commits_to_process = [head_commit] # Use head_commit as the primary source
+            sha_to_update_state = head_commit_id # This is the SHA representing the push tip
+            logger.debug(f"Processing head_commit: {head_commit_id}")
+        elif commits:
+            commits_to_process = commits # Fallback to commits list
+            # If using commits list, the last commit's SHA is the best candidate for state update
+            if commits:
+                sha_to_update_state = commits[-1].get('id') 
+            logger.debug(f"Processing commits list (count: {len(commits)}). Potential state update SHA: {sha_to_update_state}")
+        else:
+             # This case should ideally not be reached due to the check above, but included for completeness
+             logger.warning(f"No processable commit data found in push event for {repo_full_name}. Skipping.")
+             return {"message": "No processable commit data"}
+
+        processed_new_commit = False
+        for commit in commits_to_process:
+            commit_sha = commit.get("id")
+            if not commit_sha:
+                logger.warning("Skipping commit in payload with missing 'id'.")
+                continue
+            
+            # Avoid reprocessing the last known SHA for this repo
+            last_known_sha_for_repo = LAST_PROCESSED_SHA.get(repo_full_name)
+            if last_known_sha_for_repo and commit_sha == last_known_sha_for_repo:
+                logger.debug(f"Skipping commit {commit_sha} for {repo_full_name} as it matches last known SHA {last_known_sha_for_repo}.")
+                continue
+
+            # Inner try-except for processing individual commits within the push
+            try:
+                # Construct RID
+                rid = GithubCommit(owner=repo_owner, repo=repo_name, sha=commit_sha)
+                
+                # Extract details - ensure keys exist
+                author = commit.get("author", {})
+                committer = commit.get("committer", {})
+                
+                contents = {
+                    "sha": commit_sha,
+                    "message": commit.get("message"),
+                    "author_name": author.get("name"),
+                    "author_email": author.get("email"),
+                    "author_date": commit.get("timestamp"), # GitHub often uses 'timestamp'
+                    "committer_name": committer.get("name"),
+                    "committer_email": committer.get("email"),
+                    "committer_date": committer.get("timestamp"),
+                    "html_url": commit.get("url"), # Use 'url' from webhook payload
+                    "parents": commit.get("parents", []) # Typically a list of SHAs in webhook
+                }
+                
+                bundle = Bundle.generate(rid=rid, contents=contents)
+                logger.debug(f"Bundling webhook commit {rid}")
+                node.processor.handle(bundle=bundle)
+                
+                processed_new_commit = True # Mark that we processed at least one new commit
+            
+            except Exception as e:
+                 logger.error(f"Error processing webhook commit {commit_sha} for {repo_full_name}: {e}", exc_info=True)
+                 # Decide whether to continue processing other commits in the push or stop
+                 continue # Continue with next commit in the webhook push
+        
+        # Update state file only if we processed a new commit and have a valid SHA representing the push tip
+        if processed_new_commit and sha_to_update_state:
+            # Check again if the sha_to_update is different from the stored one before writing
+            last_known_sha_for_repo = LAST_PROCESSED_SHA.get(repo_full_name)
+            if sha_to_update_state != last_known_sha_for_repo:
+                logger.info(f"Webhook processing complete for {repo_full_name}. Updating state to SHA: {sha_to_update_state}")
+                update_state_file(repo_full_name, sha_to_update_state) 
+            else:
+                 logger.info(f"Webhook processing complete for {repo_full_name}. State SHA {sha_to_update_state} already stored.")
+        elif processed_new_commit:
+             logger.warning(f"Webhook processing complete for {repo_full_name}. Processed new commit(s) but could not determine SHA for state update.")
+        else:
+             logger.info(f"Webhook processing complete for {repo_full_name}. No new commits processed or state updated.")
+
+        return {"message": "Webhook processed successfully"}
+
+    # Exception handlers are now correctly indented relative to the main 'try' block
+    except HTTPException as he:
+        # Re-raise HTTP exceptions to return proper status codes
+        logger.warning(f"HTTP Exception during webhook processing: {he.detail}")
+        raise he
+    except Exception as e:
+        logger.error(f"Unexpected error handling webhook event {x_github_event}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error handling webhook")
+
+
+
+================================================
+FILE: services/github/node/handlers/github.py
+================================================
+import logging
+from rid_lib.ext import Bundle
+# Assuming GithubCommit RID type is accessible
+from ..core import node # Import the initialized node instance
+from ..types import GithubCommit # Ensure this import is correct
+
+# Imports needed for coordinator_contact handler from refactor.md
+from koi_net.processor.handler import HandlerType
+from koi_net.processor.knowledge_object import KnowledgeObject, KnowledgeSource
+from koi_net.processor.interface import ProcessorInterface
+from koi_net.protocol.node import NodeProfile
+from koi_net.protocol.event import EventType
+from koi_net.protocol.edge import EdgeType
+from koi_net.protocol.helpers import generate_edge_bundle
+from rid_lib.types import KoiNetNode # Assuming this RID type is accessible
+
+logger = logging.getLogger(__name__)
+
+@node.processor.register_handler(HandlerType.Network, rid_types=[KoiNetNode])
+def coordinator_contact(processor: ProcessorInterface, kobj: KnowledgeObject):
+    """Handles discovery of the coordinator node (or other nodes providing KoiNetNode events).
+    
+    On discovering a NEW coordinator, proposes a WEBHOOK edge for bidirectional
+    communication and requests a list of other known nodes (sync).
+    (Based on refactor.md example)
+    """
+    if kobj.normalized_event_type != EventType.NEW:
+        logger.debug(f"Ignoring non-NEW event for KoiNetNode {kobj.rid}")
+        return
+        
+    # Validate that the discovered node actually provides network events
+    try:
+        profile = kobj.bundle.validate_contents(NodeProfile)
+        if KoiNetNode not in profile.provides.event:
+            logger.debug(f"Node {kobj.rid} does not provide KoiNetNode events. Ignoring.")
+            return
+    except Exception as e:
+        logger.warning(f"Could not validate NodeProfile for {kobj.rid}: {e}")
+        return
+
+    logger.info(f"Identified potential coordinator/peer: {kobj.rid}; proposing WEBHOOK edge")
+    try:
+        # Propose edge FROM coordinator TO self
+        edge_bundle = generate_edge_bundle(
+            source=kobj.rid, 
+            target=node.identity.rid,
+            edge_type=EdgeType.WEBHOOK,
+            rid_types=[KoiNetNode] # Specify the type of information this edge carries
+        )
+        processor.handle(bundle=edge_bundle)
+    except Exception as e:
+        logger.error(f"Failed to generate or handle WEBHOOK edge bundle for {kobj.rid}: {e}", exc_info=True)
+
+    # Sync network nodes from the discovered node
+    logger.info(f"Syncing network nodes from {kobj.rid}")
+    try:
+        payload = processor.network.request_handler.fetch_rids(kobj.rid, rid_types=[KoiNetNode])
+        if not payload or not payload.rids:
+             logger.warning(f"Received empty RIDs payload from {kobj.rid} during sync.")
+             return
+             
+        logger.debug(f"Received {len(payload.rids)} RIDs from {kobj.rid}")
+        for rid in payload.rids:
+            # Don't process self or already known nodes
+            if rid == processor.identity.rid or processor.cache.exists(rid):
+                continue
+            logger.debug(f"Handling discovered RID from sync: {rid}")
+            # Handle the RID to fetch its details (profile, etc.)
+            processor.handle(rid=rid, source=KnowledgeSource.External)
+    except Exception as e:
+        logger.error(f"Failed during network sync with {kobj.rid}: {e}", exc_info=True)
+
+@node.processor.register_handler(HandlerType.Bundle, rid_types=[GithubCommit])
+def handle_github_commit(processor: ProcessorInterface, kobj: KnowledgeObject):
+    """
+    Basic handler for processing GithubCommit bundles.
+    Currently just logs information.
+    
+    Args:
+        bundle: The Bundle object containing the GithubCommit RID and contents.
+    """
+    try:
+        # kobj.bundle is guaranteed to exist in Bundle handler phase
+        bundle = kobj.bundle
+        rid: GithubCommit = bundle.rid
+        contents: dict = bundle.contents
+        
+        logger.info(f"Processing commit: {rid} (Normalized Type: {kobj.normalized_event_type}, Source: {kobj.source})")
+        # Log some details from the contents for visibility
+        logger.debug(f"  Author: {contents.get('author_name')} <{contents.get('author_email')}>")
+        logger.debug(f"  Message: {contents.get('message', '').splitlines()[0][:80]}...") # Log first line up to 80 chars
+        logger.debug(f"  URL: {contents.get('html_url')}")
+
+        # Default Bundle handler will write to cache based on normalized_event_type.
+        # If you needed to modify contents *before* caching, you would return
+        # the modified kobj here: return kobj
+
+        # If you wanted to stop processing this specific KObj (e.g., based on content),
+        # you could return STOP_CHAIN here: return STOP_CHAIN
+
+        # Returning None passes the kobj unchanged to the next handler in the chain
+        # (likely the default handler which performs the cache write)
+        return None
+
+    except Exception as e:
+        logger.error(f"Error handling GithubCommit bundle {kobj.rid}: {e}", exc_info=True)
+        # Decide if error should stop the pipeline for this KObj
+        # return STOP_CHAIN
+        return None # Continue processing despite handler error
+
+# Add a NEW handler specifically to propose a GithubCommit edge to the coordinator
+@node.processor.register_handler(HandlerType.Final, rid_types=[KoiNetNode])
+def propose_github_commit_edge_to_coordinator(processor: ProcessorInterface, kobj: KnowledgeObject):
+    # This handler runs after a NEW KoiNetNode is fully processed (cached, graph updated, default edges proposed)
+    # It's in the Final phase, less intrusive to core pipeline flow.
+    # Simplified logic: If we just processed a NEW KoiNetNode and it's the *only* other node in our graph besides ourselves,
+    # assume it's the coordinator and propose the GithubCommit edge.
+    if kobj.normalized_event_type != EventType.NEW:
+        return
+        
+    known_peers = processor.network.graph.get_neighbors()
+    if len(known_peers) == 1 and known_peers[0] == kobj.rid:
+        logger.info(f"Assuming {kobj.rid} is the coordinator. Proposing WEBHOOK edge for GithubCommit events.")
+        try:
+            github_edge_bundle = generate_edge_bundle(
+                source=node.identity.rid, # I am the source of these events
+                target=kobj.rid,           # The coordinator is the target
+                edge_type=EdgeType.WEBHOOK, # Use webhook
+                rid_types=[GithubCommit]    # Specify GithubCommit events
+            )
+            # Queue this new edge bundle for processing
+            processor.handle(bundle=github_edge_bundle)
+        except Exception as e:
+            logger.error(f"Failed to generate/handle GithubCommit edge bundle for {kobj.rid}: {e}", exc_info=True)
+
+logger.info("GithubCommit Bundle handler and KoiNetNode handlers registered.")
+
+

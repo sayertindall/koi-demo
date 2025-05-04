@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "koi-net-hackmd-sensor-node"
+version = "0.1.0"
+dependencies = [
+    "koi-net==1.0.0b12",
+    "rid-lib>=3.2.3",
+    "rich",
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "requests",
+    "ruamel.yaml",
+    "python-dotenv"
+]
+
+[tool.setuptools]
+package-dir = {"" = "."} 

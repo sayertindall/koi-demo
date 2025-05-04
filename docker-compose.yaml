@@ -1,0 +1,69 @@
+services:
+  coordinator:
+    build:
+      context: ./nodes/koi-net-coordinator-node
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./config/docker/global.env
+    environment:
+      - RUN_CONTEXT=docker
+      - KOI_CONFIG_MODE=docker
+    volumes:
+      - ./config:/config:ro
+      - cache_data:/data/cache
+    restart: unless-stopped
+    networks:
+      - koinet
+
+  github-sensor:
+    build:
+      context: ./nodes/koi-net-github-sensor-node
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./config/docker/global.env
+    environment:
+      - RUN_CONTEXT=docker
+      - KOI_CONFIG_MODE=docker
+    volumes:
+      - ./config:/config:ro
+      - cache_data:/data/cache
+      - state_data:/app
+    depends_on:
+      - coordinator
+    restart: unless-stopped
+    networks:
+      - koinet
+
+  hackmd-sensor:
+    build:
+      context: ./nodes/koi-net-hackmd-sensor-node
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./config/docker/global.env
+    environment:
+      - RUN_CONTEXT=docker
+      - KOI_CONFIG_MODE=docker
+    volumes:
+      - ./config:/config:ro
+      - cache_data:/data/cache
+      - state_data_hackmd:/app
+    depends_on:
+      - coordinator
+    restart: unless-stopped
+    networks:
+      - koinet
+
+volumes:
+  cache_data:
+    driver: local
+  state_data:
+    driver: local
+  state_data_hackmd:
+    driver: local
+
+networks:
+  koinet:
+    driver: bridge

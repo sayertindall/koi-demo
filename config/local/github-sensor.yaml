@@ -1,0 +1,18 @@
+edges:
+  coordinator_url: http://0.0.0.0:8080/koi-net
+runtime:
+  base_url: http://0.0.0.0:8001/koi-net
+  cache_dir: /data/cache
+  host: 0.0.0.0
+  log_level: INFO
+  port: 8001
+  state_file: /data/cache/github_state.json
+sensor:
+  kind: github
+  mode: webhook
+  poll_interval: 60
+  repos:
+    - blockscience/target-repo-1
+    - blockscience/target-repo-2
+webhook:
+  secret_env_var: GITHUB_WEBHOOK_SECRET
