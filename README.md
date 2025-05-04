@@ -1,10 +1,10 @@
-# KOI‑net Demo
+# KOI‑net Demo
 
-_Autonomous Sensor‑Processor Subnet for GitHub & HackMD_
+_Autonomous Sensor‑Processor Subnet for GitHub & HackMD_
 
 ---
 
-## 1 Project Title & Tagline
+## 1 Project Title & Tagline
 
 **KOI‑net Demo – from SaaS events to knowledge objects, fully automatically**
 
@@ -12,13 +12,13 @@ _Autonomous Sensor‑Processor Subnet for GitHub & HackMD_
 
 ## 2 Overview
 
-**KOI‑net** (Core Orchestration Interface) is a lightweight, event‑driven protocol for wiring arbitrarily many **sensors** (ingestion nodes) and **processors** (analysis nodes) into a self‑organising subnet.  
+**KOI‑net** (Core Orchestration Interface) is a lightweight, event‑driven protocol for wiring arbitrarily many **sensors** (ingestion nodes) and **processors** (analysis nodes) into a self‑organising subnet.  
 This demo ships five containerised nodes:
 
 | Kind        | Node            | Purpose                                              |
 | ----------- | --------------- | ---------------------------------------------------- |
 | Coordinator | `coordinator`   | roots the subnet, brokers edge hand‑shakes           |
-| Sensor      | `github‑sensor` | emits commit manifests from one or more GitHub repos |
+| Sensor      | `github‑sensor` | emits commit manifests from one or more GitHub repos |
 | Sensor      | `hackmd‑sensor` | emits note manifests from a HackMD team              |
 | Processor   | `processor‑a`   | indexes GitHub bundles, exposes `/search`            |
 | Processor   | `processor‑b`   | indexes HackMD bundles, exposes `/search`            |
@@ -32,33 +32,33 @@ The goal is to show an **end‑to‑end autonomous pipeline**: sensors publish m
 ```mermaid
 flowchart LR
     subgraph Sensors
-        G[GitHub Sensor]:::sensor
-        H[HackMD Sensor]:::sensor
+        G["GitHub Sensor"]:::sensor
+        H["HackMD Sensor"]:::sensor
     end
     subgraph Processors
-        A[Processor A<br>(GitHub indexer)]:::proc
-        B[Processor B<br>(HackMD indexer)]:::proc
+        A["Processor A<br>(GitHub indexer)"]:::proc
+        B["Processor B<br>(HackMD indexer)"]:::proc
     end
-    C(Coordinator):::coord
+    C["Coordinator"]:::coord
 
-    %% control‑plane handshakes
-    G -- propose / accept --> C
-    H -- propose / accept --> C
-    A -- propose / accept --> C
-    B -- propose / accept --> C
-    A <---> B
+    %% control-plane handshakes
+    G -- "propose / accept" --> C
+    H -- "propose / accept" --> C
+    A -- "propose / accept" --> C
+    B -- "propose / accept" --> C
+    A <--> B
 
-    %% data‑plane
-    G -- manifests --> A
-    H -- manifests --> B
-    A -- derived RIDs --> B
+    %% data-plane
+    G -- "manifests" --> A
+    H -- "manifests" --> B
+    A -- "derived RIDs" --> B
 
     classDef sensor fill:#dae8fc,stroke:#6c8ebf;
-    classDef proc   fill:#e1d5e7,stroke:#9673a6;
-    classDef coord  fill:#d5e8d4,stroke:#82b366;
+    classDef proc fill:#e1d5e7,stroke:#9673a6;
+    classDef coord fill:#d5e8d4,stroke:#82b366;
 ```
 
-### 3.1 Service Topology
+### 3.1 Service Topology
 
 | Service         | Port   | Key Routes                                                         |            |
 | --------------- | ------ | ------------------------------------------------------------------ | ---------- |
@@ -68,11 +68,11 @@ flowchart LR
 | `processor‑a`   | `8011` | \`/search?q=\<sha                                                  | keyword>\` |
 | `processor‑b`   | `8012` | \`/search?q=\<tag                                                  | title>\`   |
 
-All nodes speak KOI on the same base path so processors can dereference bundles from any peer.&#x20;
+All nodes speak KOI on the same base path so processors can dereference bundles from any peer.
 
 ---
 
-## 4 Key Features
+## 4 Key Features
 
 - **Autonomous edge negotiation** – every node bootstraps with a single URL (the Coordinator) and self‑forms the rest of the graph.
 - **Manifest‑first protocol** – processors download full bundles only when hashes change, keeping bandwidth minimal.
@@ -82,7 +82,7 @@ All nodes speak KOI on the same base path so processors can dereference bundles 
 
 ---
 
-## 5 Directory Structure
+## 5 Directory Structure
 
 ```tree
 .
@@ -97,7 +97,7 @@ All nodes speak KOI on the same base path so processors can dereference bundles 
 └─ rid_types/          # shared RID class re‑exports
 ```
 
-## 6 Quick Start
+## 6 Quick Start
 
 ### 6.1 Prerequisites
 
@@ -190,7 +190,7 @@ Every key in the YAML can be overridden by exporting the same‑named env var.
 GET /koi-net/health       # all nodes expose this
 ```
 
-### 8.2 KOI Protocol
+### 8.2 KOI Protocol
 
 | Path                        | Method | Purpose                     |
 | --------------------------- | ------ | --------------------------- |
@@ -210,13 +210,13 @@ GET http://processor-a:8011/search?q=<sha-or-text>
 GET http://processor-b:8012/search?q=<query>
 ```
 
-### 8.4 GitHub Webhook
+### 8.4 GitHub Webhook
 
 ```
 POST /github/webhook        # HMAC‑signed if GITHUB_WEBHOOK_SECRET set
 ```
 
-Payloads are queued as `GithubCommit` bundles for downstream processors.&#x20;
+Payloads are queued as `GithubCommit` bundles for downstream processors.
 
 ---
 
@@ -242,7 +242,7 @@ Unit tests use **pytest** and **httpx.AsyncClient** test clients. Run `pytest -q
 
 ---
 
-## 11 Troubleshooting & FAQ
+## 11 Troubleshooting & FAQ
 
 | Symptom                           | Fix                                          |
 | --------------------------------- | -------------------------------------------- |
@@ -263,7 +263,7 @@ Unit tests use **pytest** and **httpx.AsyncClient** test clients. Run `pytest -q
 
 ## 13 License
 
-All code is released under the **MIT License**. See individual node folders for the full text.&#x20;
+All code is released under the **MIT License**. See individual node folders for the full text.
 
 ```
 
