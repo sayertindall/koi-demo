@@ -73,7 +73,7 @@ docker-rebuild:
 
 up:
 	@echo "Starting Docker services..."
-	docker compose up -d
+	docker compose up 
 
 down:
 	@echo "Stopping Docker services..."
