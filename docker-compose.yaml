@@ -12,9 +12,16 @@ services:
     volumes:
       - ./config:/config:ro
       - cache_data:/data/cache
+      - coordinator_state_data:/app/.koi/coordinator
     restart: unless-stopped
     networks:
       - koinet
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/koi-net/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   github-sensor:
     build:
@@ -29,12 +36,19 @@ services:
     volumes:
       - ./config:/config:ro
       - cache_data:/data/cache
-      - state_data:/app
+      - github_state_data:/app/.koi/github
     depends_on:
-      - coordinator
+      coordinator:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - koinet
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8001/koi-net/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   hackmd-sensor:
     build:
@@ -49,19 +63,28 @@ services:
     volumes:
       - ./config:/config:ro
       - cache_data:/data/cache
-      - state_data_hackmd:/app
+      - hackmd_state_data:/app/.koi/hackmd
     depends_on:
-      - coordinator
+      coordinator:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - koinet
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8002/koi-net/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   cache_data:
     driver: local
-  state_data:
+  coordinator_state_data:
     driver: local
-  state_data_hackmd:
+  github_state_data:
+    driver: local
+  hackmd_state_data:
     driver: local
 
 networks:

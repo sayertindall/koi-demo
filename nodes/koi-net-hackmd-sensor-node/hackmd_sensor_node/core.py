@@ -21,13 +21,11 @@ name = "hackmd"
 identity_dir = f".koi/{name}"
 # cache_dir = f".koi/{name}/rid_cache_{name}" # Removed
 
-# Clear existing identity directory
-# Consider making this optional
-logger.info(f"Attempting to clear existing identity directory: {identity_dir}")
-shutil.rmtree(identity_dir, ignore_errors=True)
-# shutil.rmtree(cache_dir, ignore_errors=True) # Cache dir managed by Docker volume
+# Clear existing identity directory - REMOVED
+# logger.info(f"Attempting to clear existing identity directory: {identity_dir}")
+# shutil.rmtree(identity_dir, ignore_errors=True)
 
-# Recreate the identity directory
+# Recreate the identity directory - Ensure it exists
 os.makedirs(identity_dir, exist_ok=True)
 # os.makedirs(cache_dir, exist_ok=True) # Cache dir managed by Docker volume
 logger.info(f"Ensured identity directory exists: {identity_dir}")

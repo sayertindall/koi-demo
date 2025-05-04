@@ -1,4 +1,5 @@
 import logging
+import time
 from rid_lib.types import KoiNetNode, KoiNetEdge
 from koi_net.processor import ProcessorInterface
 from koi_net.processor.handler import HandlerType
@@ -23,8 +24,11 @@ def handshake_handler(proc: ProcessorInterface, kobj: KnowledgeObject):
     proc.network.push_event_to(
         event=Event.from_bundle(EventType.NEW, proc.identity.bundle),
         node=kobj.rid,
-        flush=True,
+        flush=False,
     )
+
+    # Introduce a small delay to allow sensor network interface to potentially stabilize
+    time.sleep(1)
 
     logger.info("Proposing new edge")
     # defer handling of proposed edge
@@ -35,5 +39,5 @@ def handshake_handler(proc: ProcessorInterface, kobj: KnowledgeObject):
         edge_type=EdgeType.WEBHOOK,
         rid_types=[KoiNetNode, KoiNetEdge],
     )
-    proc.handle(rid=edge_bundle.rid, event_type=EventType.FORGET)
+
     proc.handle(bundle=edge_bundle)

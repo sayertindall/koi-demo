@@ -50,27 +50,49 @@ DEFAULT_RUNTIME = {
     "port": 8080,
     "host": "0.0.0.0",
     "log_level": "INFO",
-    "base_url": None,  # Will be determined contextually by the mode's YAML
+    "base_url": None,
+    "cache_dir": None,
 }
 
 # --- Determine Run Context & Set Defaults ---
 is_docker = os.getenv("RUN_CONTEXT") == "docker" or CONFIG_MODE == "docker"
 RUNTIME_CONFIG = {**DEFAULT_RUNTIME, **CONFIG.get("runtime", {})}
 
-# Export specific values for easier access (URLs come directly from mode's YAML)
-PORT = RUNTIME_CONFIG.get("port", 8080)
-HOST = RUNTIME_CONFIG.get("host", "127.0.0.1" if not is_docker else "0.0.0.0")
+# Adjust paths based on context
+LOCAL_DATA_BASE = Path(".koi/shared_cache") # Define a local base if needed
+DOCKER_CACHE_DIR_DEFAULT = "/data/cache" # Default for Docker
+
+# Determine Cache Dir
+if is_docker:
+    CACHE_DIR = RUNTIME_CONFIG.get("cache_dir", DOCKER_CACHE_DIR_DEFAULT)
+else:
+    # For local, use the config value or construct relative path
+    cache_dir_config = RUNTIME_CONFIG.get("cache_dir")
+    if cache_dir_config:
+        CACHE_DIR = str(Path(cache_dir_config)) # Respect config if set
+    else:
+        LOCAL_DATA_BASE.mkdir(parents=True, exist_ok=True)
+        CACHE_DIR = str(LOCAL_DATA_BASE) # Fallback local path
+
+# Ensure the resolved CACHE_DIR exists
+Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
+
+# Export specific values for easier access
+PORT = RUNTIME_CONFIG.get("port")
+HOST = RUNTIME_CONFIG.get("host")
 LOG_LEVEL = RUNTIME_CONFIG.get("log_level", "INFO").upper()
 BASE_URL = RUNTIME_CONFIG.get("base_url")
 
-# NOTE: Coordinator doesn't have CACHE_DIR or STATE_FILE_PATH to adjust
-
 logger.info(
-    f"Coordinator configured with MODE={CONFIG_MODE}, PORT={PORT}, BASE_URL={BASE_URL}, LOG_LEVEL={LOG_LEVEL}"
+    f"Coordinator configured with MODE={CONFIG_MODE}, PORT={PORT}, BASE_URL={BASE_URL}, LOG_LEVEL={LOG_LEVEL}, CACHE_DIR={CACHE_DIR}"
 )
 
 # Check for required config
 if not BASE_URL:
     logger.critical(
         "Configuration error: runtime.base_url is not set or resolved correctly."
+    )
+if not CACHE_DIR:
+    logger.critical(
+        "Configuration error: runtime.cache_dir is not set or resolved correctly."
     )

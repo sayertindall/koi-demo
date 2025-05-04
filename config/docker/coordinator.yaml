@@ -1,5 +1,6 @@
 runtime:
   base_url: http://coordinator:8080/koi-net
+  cache_dir: /data/cache
   host: 0.0.0.0
   log_level: INFO
   port: 8080

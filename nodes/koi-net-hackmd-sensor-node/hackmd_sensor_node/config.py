@@ -157,7 +157,9 @@ def load_polling_state():
             polling_state = json.load(f)
         logger.info(f"Loaded polling state from {state_path}")
     except FileNotFoundError:
-        logger.warning(f"Polling state file not found at {state_path}. Starting fresh.")
+        logger.warning(
+            f"Polling state file not found at {state_path}. This is expected on first run. Starting fresh."
+        )
         polling_state = {}
     except json.JSONDecodeError:
         logger.error(

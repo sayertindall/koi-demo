@@ -158,7 +158,7 @@ def load_state():
         )
     except FileNotFoundError:
         logger.warning(
-            f"State file '{state_path}' not found. Starting with empty state."
+            f"State file '{state_path}' not found. This is expected on first run. Starting with empty state (will perform full backfill)."
         )
         LAST_PROCESSED_SHA = {}
     except json.JSONDecodeError:

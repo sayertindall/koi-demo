@@ -26,8 +26,8 @@ identity_dir = f".koi/{name}"
 
 # Clear existing state directories logic remains the same
 # Consider making this behavior optional or configurable
-logger.info(f"Attempting to clear existing identity directory: {identity_dir}")
-shutil.rmtree(identity_dir, ignore_errors=True)
+# logger.info(f"Attempting to clear existing identity directory: {identity_dir}")
+# shutil.rmtree(identity_dir, ignore_errors=True)
 # Cache dir managed by Docker volume, no need to clear here
 # shutil.rmtree(cache_dir, ignore_errors=True)
 
