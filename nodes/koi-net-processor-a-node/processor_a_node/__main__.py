@@ -16,5 +16,5 @@ uvicorn.run(
     host=HOST,
     port=PORT,
     log_config=None,
-    reload=True,  # Enable reload for development
+    reload=False,  # Enable reload for development
 )

@@ -10,5 +10,5 @@ uvicorn.run(
     host=HOST,
     port=PORT,
     log_config=None,
-    reload=True,
+    reload=False,
 )

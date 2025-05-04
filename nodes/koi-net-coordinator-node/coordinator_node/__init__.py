@@ -2,7 +2,7 @@ import logging
 import logging.handlers
 from rich.logging import RichHandler
 from pathlib import Path  # Import Path
-from .config_loader import LOG_LEVEL
+from .config import LOG_LEVEL
 
 # Get the root logger
 logger = logging.getLogger()

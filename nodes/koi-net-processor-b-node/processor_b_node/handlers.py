@@ -1,7 +1,8 @@
 import logging
 
 from .core import node
-from koi_net.processor import ProcessorInterface, HandlerType
+from koi_net.processor import ProcessorInterface
+from koi_net.processor.handler import HandlerType
 from koi_net.processor.knowledge_object import KnowledgeObject, KnowledgeSource
 from koi_net.protocol.node import NodeProfile
 from koi_net.protocol.event import EventType

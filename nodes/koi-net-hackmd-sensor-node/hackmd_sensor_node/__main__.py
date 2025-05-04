@@ -45,7 +45,7 @@ if __name__ == "__main__":
             host=HOST,
             port=PORT,
             log_config=None,
-            reload=True,
+            reload=False,
         )
     finally:
         # Signal threads to stop and wait for them

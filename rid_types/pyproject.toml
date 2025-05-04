@@ -12,7 +12,7 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-    "rid-lib>=3.2.1",
+    "rid-lib>=3.2.3",
 ]
 
 [project.optional-dependencies]

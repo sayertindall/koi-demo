@@ -12,7 +12,7 @@ services:
       - RID_CACHE_DIR=/data/cache
     volumes:
       - ./config:/config:ro
-      - cache_data:${RID_CACHE_DIR}
+      - cache_data:${RID_CACHE_DIR:-/data/cache}
       - coordinator_state_data:/app/.koi/coordinator
     restart: unless-stopped
     networks:
@@ -37,7 +37,7 @@ services:
       - RID_CACHE_DIR=/data/cache
     volumes:
       - ./config:/config:ro
-      - cache_data:${RID_CACHE_DIR}
+      - cache_data:${RID_CACHE_DIR:-/data/cache}
       - github_state_data:/app/.koi/github
     depends_on:
       coordinator:
@@ -65,7 +65,7 @@ services:
       - RID_CACHE_DIR=/data/cache
     volumes:
       - ./config:/config:ro
-      - cache_data:${RID_CACHE_DIR}
+      - cache_data:${RID_CACHE_DIR:-/data/cache}
       - hackmd_state_data:/app/.koi/hackmd
     depends_on:
       coordinator:
@@ -82,7 +82,8 @@ services:
 
   processor-a:
     build:
-      context: ./nodes/koi-net-processor-a-node
+      context: .
+      dockerfile: ./nodes/koi-net-processor-a-node/Dockerfile
     ports:
       - "8011:8011"
     env_file:
@@ -93,7 +94,7 @@ services:
       - RID_CACHE_DIR=/data/cache
     volumes:
       - ./config:/config:ro
-      - cache_data:${RID_CACHE_DIR}
+      - cache_data:${RID_CACHE_DIR:-/data/cache}
       - processor_a_state:/app/.koi/processor-a
     depends_on:
       coordinator:
@@ -112,7 +113,8 @@ services:
 
   processor-b:
     build:
-      context: ./nodes/koi-net-processor-b-node
+      context: .
+      dockerfile: ./nodes/koi-net-processor-b-node/Dockerfile
     ports:
       - "8012:8012"
     env_file:
@@ -123,7 +125,7 @@ services:
       - RID_CACHE_DIR=/data/cache
     volumes:
       - ./config:/config:ro
-      - cache_data:${RID_CACHE_DIR}
+      - cache_data:${RID_CACHE_DIR:-/data/cache}
       - processor_b_state:/app/.koi/processor-b
     depends_on:
       coordinator:

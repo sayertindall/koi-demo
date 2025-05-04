@@ -20,4 +20,3 @@ dependencies = [
 
 [tool.setuptools]
 package-dir = {"" = "."}
-packages = ["processor_a_node"] # Specify the package 
