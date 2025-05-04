@@ -12,6 +12,6 @@ sensor:
   mode: webhook
   poll_interval: 60
   repos:
-    - BlockScience/koi
+    - sayertindall/koi-demo
 webhook:
   secret_env_var: GITHUB_WEBHOOK_SECRET

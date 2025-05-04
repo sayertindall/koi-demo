@@ -5,6 +5,7 @@ edges:
 runtime:
   base_url: http://hackmd-sensor:8002/koi-net
   cache_dir: ${RID_CACHE_DIR}
+  state_file: ${RID_CACHE_DIR}/hackmd_state.json
   host: 0.0.0.0
   log_level: INFO
   port: 8002
