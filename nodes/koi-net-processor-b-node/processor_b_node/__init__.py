@@ -4,19 +4,19 @@ from rich.logging import RichHandler
 from pathlib import Path
 
 # Import LOG_LEVEL from config (will be defined there)
-# from .config import LOG_LEVEL
+from .config import LOG_LEVEL
 
 # Temporary log level until config is implemented
-TEMP_LOG_LEVEL = "INFO"
+# TEMP_LOG_LEVEL = "INFO"
 
 # Get the root logger
 logger = logging.getLogger()
 # Set the base level
-logger.setLevel(TEMP_LOG_LEVEL)
+logger.setLevel(LOG_LEVEL)
 
 # Create Rich Handler for console
 rich_handler = RichHandler(rich_tracebacks=True)
-rich_handler.setLevel(TEMP_LOG_LEVEL)
+rich_handler.setLevel(LOG_LEVEL)
 rich_format = "%(name)s - %(message)s"
 rich_datefmt = "%Y-%m-%d %H:%M:%S"
 rich_formatter = logging.Formatter(rich_format, datefmt=rich_datefmt)
@@ -30,7 +30,7 @@ log_file_path = log_dir / "processor-b-node-log.txt"
 file_handler = logging.handlers.RotatingFileHandler(
     log_file_path, maxBytes=10 * 1024 * 1024, backupCount=3
 )
-file_handler.setLevel(TEMP_LOG_LEVEL)
+file_handler.setLevel(LOG_LEVEL)
 file_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 file_datefmt = "%Y-%m-%d %H:%M:%S"
 file_formatter = logging.Formatter(file_format, datefmt=file_datefmt)
@@ -48,5 +48,5 @@ logger.addHandler(file_handler)
 # logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 
 logger.info(
-    f"Logging configured (Level: {TEMP_LOG_LEVEL}). Console via Rich, File: {log_file_path}"
+    f"Logging configured (Level: {LOG_LEVEL}). Console via Rich, File: {log_file_path}"
 )
