@@ -48,50 +48,74 @@ else:
 
 # --- End Config Loader ---
 
-# --- Determine Run Context ---
+# --- Determine Run Context & Extract Settings ---
 is_docker = os.getenv("RUN_CONTEXT") == "docker" or CONFIG_MODE == "docker"
 
-# --- Extract specific configurations with defaults ---
-SENSOR_CONFIG: Dict[str, Any] = CONFIG.get("sensor", {})
-EDGES_CONFIG: Dict[str, Any] = CONFIG.get("edges", {})
 RUNTIME_CONFIG: Dict[str, Any] = CONFIG.get("runtime", {})
+EDGES_CONFIG: Dict[str, Any] = CONFIG.get("edges", {})
+SENSOR_CONFIG: Dict[str, Any] = CONFIG.get("sensor", {})
 WEBHOOK_CONFIG: Dict[str, Any] = CONFIG.get("webhook", {})
 
 # --- Context-Aware Configuration ---
-LOCAL_DATA_BASE = Path("./.koi/github")  # Relative to workspace root for local runs
+LOCAL_DATA_BASE = Path("./.koi/github-sensor")  # Standard local path base
+DOCKER_CACHE_DIR_DEFAULT = "/data/cache"
+DOCKER_STATE_FILE_DEFAULT = "/data/github_state.json"
 
-# Base configuration values (URLs are now directly from the correct mode's YAML)
-MONITORED_REPOS: List[str] = SENSOR_CONFIG.get("repos", [])
-POLL_INTERVAL: int = SENSOR_CONFIG.get("poll_interval", 60)
-SENSOR_MODE: str = SENSOR_CONFIG.get("mode", "webhook")
-HOST: str = RUNTIME_CONFIG.get("host", "0.0.0.0" if not is_docker else "0.0.0.0")
+# Base configuration values
+HOST: str = RUNTIME_CONFIG.get("host", "127.0.0.1" if not is_docker else "0.0.0.0")
 PORT: int = RUNTIME_CONFIG.get("port", 8001)
 LOG_LEVEL: str = RUNTIME_CONFIG.get("log_level", "INFO").upper()
-COORDINATOR_URL = EDGES_CONFIG.get("coordinator_url")
 BASE_URL = RUNTIME_CONFIG.get("base_url")
+COORDINATOR_URL = EDGES_CONFIG.get("coordinator_url")
 
-# Adjust Cache and State Paths based on run context
-DOCKER_CACHE_DIR = RUNTIME_CONFIG.get("cache_dir", "/data/cache")  # Default Docker path
-DOCKER_STATE_FILE = RUNTIME_CONFIG.get(
-    "state_file", os.path.join(DOCKER_CACHE_DIR, "github_state.json")
-)
+# Determine Cache Dir
+# Prioritize environment variable, then YAML, then fallback
+env_cache_dir = os.getenv("RID_CACHE_DIR")
+yaml_cache_dir = RUNTIME_CONFIG.get("cache_dir")
 
-if is_docker:
-    CACHE_DIR = DOCKER_CACHE_DIR
-    STATE_FILE_PATH = (
-        Path(DOCKER_STATE_FILE)
-        if Path(DOCKER_STATE_FILE).is_absolute()
-        else Path("/app") / DOCKER_STATE_FILE  # Assume /app if relative in Docker
-    )
+if env_cache_dir:
+    CACHE_DIR = env_cache_dir
+elif yaml_cache_dir and "${RID_CACHE_DIR}" not in yaml_cache_dir:
+    CACHE_DIR = yaml_cache_dir
 else:
-    LOCAL_DATA_BASE.mkdir(parents=True, exist_ok=True)
-    CACHE_DIR = str(LOCAL_DATA_BASE / "cache")
-    STATE_FILE_PATH = LOCAL_DATA_BASE / "github_state.json"
-    logger.debug(f"Using local CACHE_DIR: {CACHE_DIR}")
-    logger.debug(f"Using local STATE_FILE_PATH: {STATE_FILE_PATH}")
+    if is_docker:
+        CACHE_DIR = DOCKER_CACHE_DIR_DEFAULT
+    else:
+        LOCAL_DATA_BASE.mkdir(parents=True, exist_ok=True)
+        CACHE_DIR = str(LOCAL_DATA_BASE / "cache")
+    logger.warning(
+        f"RID_CACHE_DIR env var not set and yaml cache_dir missing or is placeholder. Falling back to default: {CACHE_DIR}"
+    )
 
-# Ensure resolved CACHE_DIR exists
+# Determine State File Path (also prioritize env var if cache dir is used)
+# Assume state file lives within the cache dir unless explicitly set elsewhere
+env_state_file = os.getenv("GITHUB_STATE_FILE")
+yaml_state_file = RUNTIME_CONFIG.get("state_file")
+
+if env_state_file:
+    STATE_FILE = env_state_file
+elif yaml_state_file and "${RID_CACHE_DIR}" in yaml_state_file and env_cache_dir:
+    # If yaml uses placeholder and env var is set, substitute env var
+    STATE_FILE = yaml_state_file.replace("${RID_CACHE_DIR}", env_cache_dir)
+elif yaml_state_file and "${RID_CACHE_DIR}" not in yaml_state_file:
+    # If yaml is set directly, use it
+    STATE_FILE = yaml_state_file
+else:
+    # Fallback: place it inside the resolved CACHE_DIR
+    default_filename = "github_state.json"
+    STATE_FILE = str(Path(CACHE_DIR) / default_filename)
+    logger.warning(
+        f"GITHUB_STATE_FILE env var not set and yaml state_file missing or uses placeholder without RID_CACHE_DIR env var. Falling back to default: {STATE_FILE}"
+    )
+
+# Ensure directories exist
 Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
+Path(STATE_FILE).parent.mkdir(parents=True, exist_ok=True) # Ensure state file dir exists
+
+# Sensor specific settings
+SENSOR_KIND: str = SENSOR_CONFIG.get("kind", "github")
+SENSOR_MODE: str = SENSOR_CONFIG.get("mode", "webhook")
+MONITORED_REPOS: List[str] = SENSOR_CONFIG.get("repos", [])
 
 # --- Load Secrets from Environment Variables ---
 GITHUB_TOKEN: str | None = os.getenv("GITHUB_TOKEN")
@@ -123,13 +147,12 @@ logger.info("GitHub Sensor Configuration Loaded:")
 logger.info(f"  Config Mode: {CONFIG_MODE}")
 logger.info(f"  Is Docker Context: {is_docker}")
 logger.info(f"  Sensor Mode: {SENSOR_MODE}")
-logger.info(f"  Monitored Repos: {MONITORED_REPOS}")
 logger.info(f"  Coordinator URL: {COORDINATOR_URL}")
 logger.info(f"  Runtime Base URL: {BASE_URL}")
 logger.info(f"  Runtime Host: {HOST}")
 logger.info(f"  Runtime Port: {PORT}")
 logger.info(f"  Cache Dir: {CACHE_DIR}")
-logger.info(f"  State File Path: {STATE_FILE_PATH}")
+logger.info(f"  State File Path: {STATE_FILE}")
 logger.info(f"  GitHub Token Loaded: {bool(GITHUB_TOKEN)}")
 logger.info(f"  Webhook Secret Loaded: {bool(GITHUB_WEBHOOK_SECRET)}")
 
@@ -150,9 +173,9 @@ LAST_PROCESSED_SHA: Dict[str, str] = {}  # Dictionary mapping repo_name -> last_
 
 
 def load_state():
-    """Loads the last processed SHA state from the JSON file specified by STATE_FILE_PATH."""
+    """Loads the last processed SHA state from the JSON file specified by STATE_FILE."""
     global LAST_PROCESSED_SHA
-    state_path = STATE_FILE_PATH
+    state_path = STATE_FILE
     try:
         with open(state_path, "r") as f:
             LAST_PROCESSED_SHA = json.load(f)
@@ -182,7 +205,7 @@ def update_state_file(repo_name: str, last_sha: str):
     global LAST_PROCESSED_SHA
     LAST_PROCESSED_SHA[repo_name] = last_sha
 
-    state_path = STATE_FILE_PATH
+    state_path = STATE_FILE
     try:
         state_path.parent.mkdir(parents=True, exist_ok=True)
         with open(state_path, "w") as f:

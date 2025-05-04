@@ -9,9 +9,10 @@ services:
     environment:
       - RUN_CONTEXT=docker
       - KOI_CONFIG_MODE=docker
+      - RID_CACHE_DIR=/data/cache
     volumes:
       - ./config:/config:ro
-      - cache_data:/data/cache
+      - cache_data:${RID_CACHE_DIR}
       - coordinator_state_data:/app/.koi/coordinator
     restart: unless-stopped
     networks:
@@ -33,9 +34,10 @@ services:
     environment:
       - RUN_CONTEXT=docker
       - KOI_CONFIG_MODE=docker
+      - RID_CACHE_DIR=/data/cache
     volumes:
       - ./config:/config:ro
-      - cache_data:/data/cache
+      - cache_data:${RID_CACHE_DIR}
       - github_state_data:/app/.koi/github
     depends_on:
       coordinator:
@@ -60,9 +62,10 @@ services:
     environment:
       - RUN_CONTEXT=docker
       - KOI_CONFIG_MODE=docker
+      - RID_CACHE_DIR=/data/cache
     volumes:
       - ./config:/config:ro
-      - cache_data:/data/cache
+      - cache_data:${RID_CACHE_DIR}
       - hackmd_state_data:/app/.koi/hackmd
     depends_on:
       coordinator:
@@ -87,9 +90,10 @@ services:
     environment:
       - RUN_CONTEXT=docker
       - KOI_CONFIG_MODE=docker
+      - RID_CACHE_DIR=/data/cache
     volumes:
       - ./config:/config:ro
-      - cache_data:/data/cache
+      - cache_data:${RID_CACHE_DIR}
       - processor_a_state:/app/.koi/processor-a
     depends_on:
       coordinator:
@@ -116,9 +120,10 @@ services:
     environment:
       - RUN_CONTEXT=docker
       - KOI_CONFIG_MODE=docker
+      - RID_CACHE_DIR=/data/cache
     volumes:
       - ./config:/config:ro
-      - cache_data:/data/cache
+      - cache_data:${RID_CACHE_DIR}
       - processor_b_state:/app/.koi/processor-b
     depends_on:
       coordinator:

@@ -4,7 +4,7 @@ edges:
   coordinator_url: http://0.0.0.0:8080/koi-net
 runtime:
   base_url: http://0.0.0.0:8002/koi-net
-  cache_dir: /data/cache
+  cache_dir: ${RID_CACHE_DIR}
   host: 0.0.0.0
   log_level: INFO
   port: 8002

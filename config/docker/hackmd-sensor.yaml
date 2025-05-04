@@ -4,7 +4,7 @@ edges:
   coordinator_url: http://coordinator:8080/koi-net
 runtime:
   base_url: http://hackmd-sensor:8002/koi-net
-  cache_dir: /data/cache
+  cache_dir: ${RID_CACHE_DIR}
   host: 0.0.0.0
   log_level: INFO
   port: 8002
@@ -12,5 +12,5 @@ sensor:
   kind: hackmd
   poll_interval: 300
   target_note_ids:
-  - C1xso4C8SH-ZzDaloTq4Uw
+    - C1xso4C8SH-ZzDaloTq4Uw
   team_path: blockscience

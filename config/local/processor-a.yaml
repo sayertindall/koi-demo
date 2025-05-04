@@ -1,7 +1,7 @@
 # Processor A Config (Local)
 runtime:
   base_url: http://0.0.0.0:8011/koi-net # Use localhost for local dev
-  cache_dir: ./.koi/processor-a/cache # Local cache path
+  cache_dir: ${RID_CACHE_DIR} # Local cache path
   host: 0.0.0.0 # Bind to localhost locally
   log_level: DEBUG # More verbose locally
   port: 8011

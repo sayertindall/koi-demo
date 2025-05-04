@@ -81,18 +81,24 @@ COORDINATOR_URL = EDGES_CONFIG.get("coordinator_url")  # Should be defined in ya
 GITHUB_SENSOR_RID: str | None = PROCESSOR_A_CONFIG.get("github_sensor_rid")
 
 # Determine Cache Dir
-if is_docker:
-    CACHE_DIR = RUNTIME_CONFIG.get("cache_dir", DOCKER_CACHE_DIR_DEFAULT)
+# Prioritize environment variable, then YAML, then fallback
+env_cache_dir = os.getenv("RID_CACHE_DIR")
+yaml_cache_dir = RUNTIME_CONFIG.get("cache_dir") # This might contain ${RID_CACHE_DIR}
+
+if env_cache_dir:
+    CACHE_DIR = env_cache_dir
+elif yaml_cache_dir and "${RID_CACHE_DIR}" not in yaml_cache_dir: # If YAML is set and NOT the placeholder
+    CACHE_DIR = yaml_cache_dir
 else:
-    # For local, use the config value or construct relative path
-    cache_dir_config = RUNTIME_CONFIG.get("cache_dir")
-    if cache_dir_config:
-        CACHE_DIR = str(Path(cache_dir_config))  # Respect config if set
+    # Fallback logic if neither env var nor direct YAML value is set
+    if is_docker:
+        CACHE_DIR = DOCKER_CACHE_DIR_DEFAULT # Should not happen if env var is set in compose
     else:
         LOCAL_DATA_BASE.mkdir(parents=True, exist_ok=True)
-        CACHE_DIR = str(
-            LOCAL_DATA_BASE / "cache"
-        )  # Fallback local path relative to node state
+        CACHE_DIR = str(LOCAL_DATA_BASE / "cache") # Default local path
+    logger.warning(
+        f"RID_CACHE_DIR env var not set and yaml cache_dir missing or is placeholder. Falling back to default: {CACHE_DIR}"
+    )
 
 # Ensure the resolved CACHE_DIR exists
 Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)

@@ -2,11 +2,11 @@ edges:
   coordinator_url: http://0.0.0.0:8080/koi-net
 runtime:
   base_url: http://0.0.0.0:8001/koi-net
-  cache_dir: /data/cache
+  cache_dir: ${RID_CACHE_DIR}
   host: 0.0.0.0
   log_level: INFO
   port: 8001
-  state_file: /data/cache/github_state.json
+  state_file: ${RID_CACHE_DIR}/github_state.json
 sensor:
   kind: github
   mode: webhook

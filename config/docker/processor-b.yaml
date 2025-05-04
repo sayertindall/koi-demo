@@ -1,7 +1,7 @@
 # Processor B Config (Docker)
 runtime:
   base_url: http://processor-b:8012/koi-net
-  cache_dir: /data/cache # Shared cache volume
+  cache_dir: ${RID_CACHE_DIR} # Shared cache volume
   host: 0.0.0.0
   log_level: INFO
   port: 8012

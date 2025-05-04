@@ -2,6 +2,7 @@ import logging
 from ruamel.yaml import YAML
 from pathlib import Path
 import os
+from typing import Dict, Any
 
 # Configure basic logging early
 logging.basicConfig(level=logging.INFO, format="%(name)s - %(message)s")
@@ -56,23 +57,27 @@ DEFAULT_RUNTIME = {
 
 # --- Determine Run Context & Set Defaults ---
 is_docker = os.getenv("RUN_CONTEXT") == "docker" or CONFIG_MODE == "docker"
-RUNTIME_CONFIG = {**DEFAULT_RUNTIME, **CONFIG.get("runtime", {})}
+RUNTIME_CONFIG: Dict[str, Any] = {**DEFAULT_RUNTIME, **CONFIG.get("runtime", {})}
 
 # Adjust paths based on context
 LOCAL_DATA_BASE = Path(".koi/shared_cache")  # Define a local base if needed
 DOCKER_CACHE_DIR_DEFAULT = "/data/cache"  # Default for Docker
 
 # Determine Cache Dir
-if is_docker:
-    CACHE_DIR = RUNTIME_CONFIG.get("cache_dir", DOCKER_CACHE_DIR_DEFAULT)
+# Prioritize environment variable, then YAML, then fallback
+env_cache_dir = os.getenv("RID_CACHE_DIR")
+yaml_cache_dir = RUNTIME_CONFIG.get("cache_dir")
+
+if env_cache_dir:
+    CACHE_DIR = env_cache_dir
+elif yaml_cache_dir and "${RID_CACHE_DIR}" not in yaml_cache_dir:
+    CACHE_DIR = yaml_cache_dir
 else:
-    # For local, use the config value or construct relative path
-    cache_dir_config = RUNTIME_CONFIG.get("cache_dir")
-    if cache_dir_config:
-        CACHE_DIR = str(Path(cache_dir_config))  # Respect config if set
-    else:
-        LOCAL_DATA_BASE.mkdir(parents=True, exist_ok=True)
-        CACHE_DIR = str(LOCAL_DATA_BASE)  # Fallback local path
+    # Fallback logic (adjust default as needed)
+    CACHE_DIR = ".koi/shared_cache"
+    logger.warning(
+        f"RID_CACHE_DIR env var not set and yaml cache_dir missing or is placeholder. Falling back to default: {CACHE_DIR}"
+    )
 
 # Ensure the resolved CACHE_DIR exists
 Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)

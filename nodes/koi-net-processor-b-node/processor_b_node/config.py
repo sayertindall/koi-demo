@@ -79,15 +79,23 @@ COORDINATOR_URL = EDGES_CONFIG.get("coordinator_url")  # Should be defined in ya
 HACKMD_SENSOR_RID: str | None = PROCESSOR_B_CONFIG.get("hackmd_sensor_rid")
 
 # Determine Cache Dir
-if is_docker:
-    CACHE_DIR = RUNTIME_CONFIG.get("cache_dir", DOCKER_CACHE_DIR_DEFAULT)
+# Prioritize environment variable, then YAML, then fallback
+env_cache_dir = os.getenv("RID_CACHE_DIR")
+yaml_cache_dir = RUNTIME_CONFIG.get("cache_dir")
+
+if env_cache_dir:
+    CACHE_DIR = env_cache_dir
+elif yaml_cache_dir and "${RID_CACHE_DIR}" not in yaml_cache_dir:
+    CACHE_DIR = yaml_cache_dir
 else:
-    cache_dir_config = RUNTIME_CONFIG.get("cache_dir")
-    if cache_dir_config:
-        CACHE_DIR = str(Path(cache_dir_config))  # Respect config if set
+    if is_docker:
+        CACHE_DIR = DOCKER_CACHE_DIR_DEFAULT
     else:
         LOCAL_DATA_BASE.mkdir(parents=True, exist_ok=True)
-        CACHE_DIR = str(LOCAL_DATA_BASE / "cache")  # Fallback local path
+        CACHE_DIR = str(LOCAL_DATA_BASE / "cache")
+    logger.warning(
+        f"RID_CACHE_DIR env var not set and yaml cache_dir missing or is placeholder. Falling back to default: {CACHE_DIR}"
+    )
 
 # Ensure the resolved CACHE_DIR exists
 Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
