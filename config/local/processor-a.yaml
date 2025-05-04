@@ -1,0 +1,13 @@
+# Processor A Config (Local)
+runtime:
+  base_url: http://127.0.0.1:8011/koi-net # Use localhost for local dev
+  cache_dir: ./.koi/processor-a/cache # Local cache path
+  host: 127.0.0.1 # Bind to localhost locally
+  log_level: DEBUG # More verbose locally
+  port: 8011
+
+edges:
+  coordinator_url: http://127.0.0.1:8080/koi-net # Coordinator on localhost
+
+# processor_a:
+#   github_sensor_rid: "..." # Optional override for local testing

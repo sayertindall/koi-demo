@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "processor-a-node"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "httpx", 
+    "python-dotenv",
+    "rid-lib>=3.2.3", # Ensure compatible versions
+    "koi-net==1.0.0b12", 
+    "rich", 
+    "ruamel.yaml",
+    # Add any specific dependencies for Processor A later
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+packages = ["processor_a_node"] # Specify the package 

@@ -77,6 +77,64 @@ services:
       retries: 3
       start_period: 15s
 
+  processor-a:
+    build:
+      context: ./nodes/koi-net-processor-a-node
+    ports:
+      - "8011:8011"
+    env_file:
+      - ./config/docker/global.env
+    environment:
+      - RUN_CONTEXT=docker
+      - KOI_CONFIG_MODE=docker
+    volumes:
+      - ./config:/config:ro
+      - cache_data:/data/cache
+      - processor_a_state:/app/.koi/processor-a
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      github-sensor:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - koinet
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8011/koi-net/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  processor-b:
+    build:
+      context: ./nodes/koi-net-processor-b-node
+    ports:
+      - "8012:8012"
+    env_file:
+      - ./config/docker/global.env
+    environment:
+      - RUN_CONTEXT=docker
+      - KOI_CONFIG_MODE=docker
+    volumes:
+      - ./config:/config:ro
+      - cache_data:/data/cache
+      - processor_b_state:/app/.koi/processor-b
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      hackmd-sensor:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - koinet
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8012/koi-net/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 volumes:
   cache_data:
     driver: local
@@ -85,6 +143,10 @@ volumes:
   github_state_data:
     driver: local
   hackmd_state_data:
+    driver: local
+  processor_a_state:
+    driver: local
+  processor_b_state:
     driver: local
 
 networks:
