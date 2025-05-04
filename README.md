@@ -260,7 +260,3 @@ Unit tests use **pytest** and **httpx.AsyncClient** test clients. Run `pytest -q
 ## 13 License
 
 All code is released under the **MIT License**. See individual node folders for the full text.
-
-```
-
-```
