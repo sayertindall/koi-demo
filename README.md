@@ -2,13 +2,9 @@
 
 _Autonomous Sensor‑Processor Subnet for GitHub & HackMD_
 
----
-
 ## 1 Project Title & Tagline
 
 **KOI‑net Demo – from SaaS events to knowledge objects, fully automatically**
-
----
 
 ## 2 Overview
 
@@ -24,8 +20,6 @@ This demo ships five containerised nodes:
 | Processor   | `processor‑b`   | indexes HackMD bundles, exposes `/search`            |
 
 The goal is to show an **end‑to‑end autonomous pipeline**: sensors publish manifests, processors resolve the bundles they care about, build local indices, and expose query endpoints – all without manual wiring beyond pointing every container at the Coordinator.
-
----
 
 ## 3 Architecture
 
@@ -66,8 +60,6 @@ flowchart LR
 
 All nodes speak KOI on the same base path so processors can dereference bundles from any peer.
 
----
-
 ## 4 Key Features
 
 - **Autonomous edge negotiation** – every node bootstraps with a single URL (the Coordinator) and self‑forms the rest of the graph.
@@ -75,8 +67,6 @@ All nodes speak KOI on the same base path so processors can dereference bundles 
 - **Pluggable processors** – add new analytics by dropping in another container that subscribes to existing RIDs.
 - **Stateless containers** – all durable artefacts live in named Docker volumes.
 - **Language‑agnostic** – only requires HTTP+JSON; the reference implementation is Python 3.12.
-
----
 
 ## 5 Directory Structure
 
@@ -154,8 +144,6 @@ All nodes speak KOI on the same base path so processors can dereference bundles 
     curl -s http://localhost:8080/koi-net/health
     ```
 
----
-
 ## 7 Configuration
 
 | Folder          | Use                                  |
@@ -175,8 +163,6 @@ Common **environment variables**
 | `RID_CACHE_DIR`         | path (inside container) for manifest/bundle cache     |
 
 Every key in the YAML can be overridden by exporting the same‑named env var.
-
----
 
 ## 8 Usage
 
@@ -214,8 +200,6 @@ POST /github/webhook        # HMAC‑signed if GITHUB_WEBHOOK_SECRET set
 
 Payloads are queued as `GithubCommit` bundles for downstream processors.
 
----
-
 ## 9 Development
 
 ```bash
@@ -230,13 +214,9 @@ pytest -q
 - Each handler registers via `@node.processor.register_handler`.
 - Add new RID classes in `rid_types/` and publish to PyPI to share across nodes.
 
----
-
 ## 10 Testing
 
 Unit tests use **pytest** and **httpx.AsyncClient** test clients. Run `pytest -q` from the repo root. Add live‑network integration tests under `tests/integration/`.
-
----
 
 ## 11 Troubleshooting & FAQ
 
@@ -246,16 +226,12 @@ Unit tests use **pytest** and **httpx.AsyncClient** test clients. Run `pytest -q
 | Processor reports "cache miss"    | ensure sensors are healthy and edge accepted |
 | GitHub rate‑limit                 | set `GITHUB_TOKEN` with repo‑scope PAT       |
 
----
-
 ## 12 Contributing
 
 1. Fork & create a feature branch.
 2. Add tests.
 3. Run `ruff` and `mypy`.
 4. Open a PR – every node is an independent Python package, so bump its version in its `pyproject.toml` if public APIs change.
-
----
 
 ## 13 License
 
