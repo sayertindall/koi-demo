@@ -1,6 +1,6 @@
 .PHONY: setup install clean coordinator github hackmd processor-a processor-b \
         demo-coordinator demo-github demo-hackmd docker-clean rebuild \
-        docker-rebuild clean-cache up down
+        docker-rebuild clean-cache up down vendor-shared
 
 setup:
 	@echo "Creating virtual environment with uv..."
@@ -96,3 +96,9 @@ up:
 down:
 	@echo "Stopping Docker services..."
 	docker compose down
+
+vendor-shared:
+	@echo "Vendoring rid_types to all nodes..."
+	@for dir in nodes/koi-net-*; do \
+	  rm -rf $$dir/rid_types && cp -r rid_types $$dir/; \
+	done
