@@ -1,14 +1,12 @@
 # KOI‑net Demo
 
-_Autonomous Sensor‑Processor Subnet for GitHub & HackMD_
-
 ## 1 Project Title & Tagline
 
-**KOI‑net Demo – from SaaS events to knowledge objects, fully automatically**
+**KOI‑net Demo**
 
 ## 2 Overview
 
-**KOI‑net** (Core Orchestration Interface) is a lightweight, event‑driven protocol for wiring arbitrarily many **sensors** (ingestion nodes) and **processors** (analysis nodes) into a self‑organising subnet.  
+**KOI‑net** is a lightweight, event‑driven protocol for wiring arbitrarily many **sensors** (ingestion nodes) and **processors** (computation nodes) into a self‑organising subnet.  
 This demo ships five containerised nodes:
 
 | Kind        | Node            | Purpose                                              |
@@ -19,7 +17,7 @@ This demo ships five containerised nodes:
 | Processor   | `processor‑a`   | indexes GitHub bundles, exposes `/search`            |
 | Processor   | `processor‑b`   | indexes HackMD bundles, exposes `/search`            |
 
-The goal is to show an **end‑to‑end autonomous pipeline**: sensors publish manifests, processors resolve the bundles they care about, build local indices, and expose query endpoints – all without manual wiring beyond pointing every container at the Coordinator.
+The goal is to show an **end‑to‑end pipeline**: sensors publish manifests, processors resolve the bundles they care about, build local indices, and expose query endpoints – all without manual wiring beyond pointing every container at the Coordinator.
 
 ## 3 Architecture
 
@@ -50,13 +48,13 @@ flowchart LR
 
 ### 3.1 Service Topology
 
-| Service         | Port   | Key Routes                                                         |            |
-| --------------- | ------ | ------------------------------------------------------------------ | ---------- |
-| `coordinator`   | `8080` | `/koi‑net/edges/*`, health `/koi‑net/health`                       |            |
-| `github‑sensor` | `8001` | GitHub webhook `/github/webhook`, all KOI paths under `/koi‑net/…` |            |
-| `hackmd‑sensor` | `8002` | all KOI paths under `/koi‑net/…`                                   |            |
-| `processor‑a`   | `8011` | \`/search?q=\<sha                                                  | keyword>\` |
-| `processor‑b`   | `8012` | \`/search?q=\<tag                                                  | title>\`   |
+| Service         | Port   | Key Routes                                                         |     |
+| --------------- | ------ | ------------------------------------------------------------------ | --- |
+| `coordinator`   | `8080` | `/koi‑net/edges/*`, health `/koi‑net/health`                       |     |
+| `github‑sensor` | `8001` | GitHub webhook `/github/webhook`, all KOI paths under `/koi‑net/…` |     |
+| `hackmd‑sensor` | `8002` | all KOI paths under `/koi‑net/…`                                   |     |
+| `processor‑a`   | `8011` | `/search?q=<sha‑or‑text>`                                          |     |
+| `processor‑b`   | `8012` | `/search?q=<query>`                                                |     |
 
 All nodes speak KOI on the same base path so processors can dereference bundles from any peer.
 
@@ -67,6 +65,7 @@ All nodes speak KOI on the same base path so processors can dereference bundles 
 - **Pluggable processors** – add new analytics by dropping in another container that subscribes to existing RIDs.
 - **Stateless containers** – all durable artefacts live in named Docker volumes.
 - **Language‑agnostic** – only requires HTTP+JSON; the reference implementation is Python 3.12.
+- **Dependency management via [UV](https://astral.sh/blog/posts/introducing-uv/)** – a fast Python package manager used for both local development and CI.
 
 ## 5 Directory Structure
 
@@ -90,59 +89,71 @@ All nodes speak KOI on the same base path so processors can dereference bundles 
 - **Python 3.12**
 - **Make**
 - **Docker & Docker Compose**
-- GitHub & HackMD API tokens
+- **UV** (for managing and installing Python packages)
+
+To install UV:
+
+```bash
+curl -Ls https://astral.sh/uv/install.sh | bash
+```
+
+Or with Rust:
+
+```bash
+cargo install uv
+```
 
 ### 6.2 Setup and Run
 
-1.  **Clone repository**
+1. **Clone repository**
 
-    ```bash
-    git clone https://github.com/sayertindall/koi-demo.git koi-demo
-    cd koi-demo
-    ```
+   ```bash
+   git clone https://github.com/sayertindall/koi-demo.git koi-demo
+   cd koi-demo
+   ```
 
-2.  **Create and activate virtual environment**
+2. **Create and activate virtual environment**
 
-    ```bash
-    make setup
-    source .venv/bin/activate
-    ```
+   ```bash
+   make setup
+   source .venv/bin/activate
+   ```
 
-3.  **Install packages**
+3. **Install packages with UV**
 
-    ```bash
-    make install
-    ```
+   ```bash
+   make install
+   ```
 
-4.  **Configure environment**
+4. **Configure environment**
 
-    ```bash
-    cp config/docker/global.env.example config/docker/global.env
-    ```
+   ```bash
+   cp config/docker/global.env.example config/docker/global.env
+   ```
 
-    Edit `config/docker/global.env` and set your:
+   Edit `config/docker/global.env` and set your:
 
-    - `HACKMD_TOKEN`
-    - `GITHUB_TOKEN`
-    - `GITHUB_WEBHOOK_SECRET`
+   - `HACKMD_TOKEN`
+   - `GITHUB_TOKEN`
+   - `GITHUB_WEBHOOK_SECRET`
 
-5.  **Start services**
+5. **Start services**
 
-    ```bash
-    make up
-    ```
+   ```bash
+   make up
+   ```
 
-6.  **Verify running containers**
+6. **Verify running containers**
 
-    ```bash
-    docker ps
-    ```
+   ```bash
+   docker ps
+   ```
 
-    You can also check the health of the coordinator:
+   You can also check the health of the coordinator:
 
-    ```bash
-    curl -s http://localhost:8080/koi-net/health
-    ```
+   ```bash
+   curl -s http://localhost:8080/koi-net/health
+   ```
 
 ## 7 Configuration
 
@@ -206,6 +217,7 @@ Payloads are queued as `GithubCommit` bundles for downstream processors.
 # editable installs
 cd nodes/koi-net-github-sensor-node
 uv pip install -e .[dev]
+
 # lint & test
 pytest -q
 ```
