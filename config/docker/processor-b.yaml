@@ -1,5 +1,5 @@
 runtime:
-  base_url: http://processor-b.onrender.com/koi-net
+  base_url: http://koi-processor-b.onrender.com/koi-net
   cache_dir: ${RID_CACHE_DIR}
   host: 0.0.0.0
   log_level: INFO

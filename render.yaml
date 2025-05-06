@@ -2,43 +2,53 @@ services:
   - type: web
     name: koi-coordinator
     env: docker
-    dockerfilePath: ./nodes/koi-net-coordinator-node/Dockerfile
+    build:
+      context: ./nodes/koi-net-coordinator-node
+      dockerfilePath: Dockerfile
     envVars:
       - fromGroup: koi-env
     plan: free
     autoDeploy: false
 
   - type: web
-    name: github-sensor
+    name: koi-github-sensor
     env: docker
-    dockerfilePath: ./nodes/koi-net-github-sensor-node/Dockerfile
+    build:
+      context: ./nodes/koi-net-github-sensor-node
+      dockerfilePath: Dockerfile
     envVars:
       - fromGroup: koi-env
     plan: free
     autoDeploy: false
 
   - type: web
-    name: hackmd-sensor
+    name: koi-hackmd-sensor
     env: docker
-    dockerfilePath: ./nodes/koi-net-hackmd-sensor-node/Dockerfile
+    build:
+      context: ./nodes/koi-net-hackmd-sensor-node
+      dockerfilePath: Dockerfile
     envVars:
       - fromGroup: koi-env
     plan: free
     autoDeploy: false
 
   - type: web
-    name: processor-a
+    name: koi-processor-a
     env: docker
-    dockerfilePath: ./nodes/koi-net-processor-a-node/Dockerfile
+    build:
+      context: ./nodes/koi-net-processor-a-node
+      dockerfilePath: Dockerfile
     envVars:
       - fromGroup: koi-env
     plan: free
     autoDeploy: false
 
   - type: web
-    name: processor-b
+    name: koi-processor-b
     env: docker
-    dockerfilePath: ./nodes/koi-net-processor-b-node/Dockerfile
+    build:
+      context: ./nodes/koi-net-processor-b-node
+      dockerfilePath: Dockerfile
     envVars:
       - fromGroup: koi-env
     plan: free
