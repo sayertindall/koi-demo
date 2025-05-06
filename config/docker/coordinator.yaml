@@ -1,5 +1,5 @@
 runtime:
-  base_url: http://coordinator:8080/koi-net
+  base_url: http://koi-coordinator.onrender.com/koi-net
   cache_dir: ${RID_CACHE_DIR}
   host: 0.0.0.0
   log_level: INFO

@@ -1,13 +1,9 @@
-# Processor B Config (Docker)
 runtime:
-  base_url: http://processor-b:8012/koi-net
-  cache_dir: ${RID_CACHE_DIR} # Shared cache volume
+  base_url: http://processor-b.onrender.com/koi-net
+  cache_dir: ${RID_CACHE_DIR}
   host: 0.0.0.0
   log_level: INFO
   port: 8012
 
 edges:
-  coordinator_url: http://coordinator:8080/koi-net
-# Optional: Specify exact sensor if discovery is problematic
-# processor_b:
-#   hackmd_sensor_rid: "orn:koi.node:<uuid_of_hackmd_sensor>"
+  coordinator_url: http://koi-coordinator.onrender.com/koi-net

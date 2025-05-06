@@ -1,9 +1,9 @@
 api:
   token_env_var: HACKMD_TOKEN
 edges:
-  coordinator_url: http://coordinator:8080/koi-net
+  coordinator_url: http://koi-coordinator.onrender.com/koi-net
 runtime:
-  base_url: http://hackmd-sensor:8002/koi-net
+  base_url: http://hackmd-sensor.onrender.com/koi-net
   cache_dir: ${RID_CACHE_DIR}
   state_file: ${RID_CACHE_DIR}/hackmd_state.json
   host: 0.0.0.0

@@ -1,0 +1,63 @@
+services:
+  - type: web
+    name: koi-coordinator
+    env: docker
+    dockerfilePath: ./nodes/koi-net-coordinator-node/Dockerfile
+    envVars:
+      - fromGroup: koi-env
+    plan: free
+    autoDeploy: false
+
+  - type: web
+    name: github-sensor
+    env: docker
+    dockerfilePath: ./nodes/koi-net-github-sensor-node/Dockerfile
+    envVars:
+      - fromGroup: koi-env
+    plan: free
+    autoDeploy: false
+
+  - type: web
+    name: hackmd-sensor
+    env: docker
+    dockerfilePath: ./nodes/koi-net-hackmd-sensor-node/Dockerfile
+    envVars:
+      - fromGroup: koi-env
+    plan: free
+    autoDeploy: false
+
+  - type: web
+    name: processor-a
+    env: docker
+    dockerfilePath: ./nodes/koi-net-processor-a-node/Dockerfile
+    envVars:
+      - fromGroup: koi-env
+    plan: free
+    autoDeploy: false
+
+  - type: web
+    name: processor-b
+    env: docker
+    dockerfilePath: ./nodes/koi-net-processor-b-node/Dockerfile
+    envVars:
+      - fromGroup: koi-env
+    plan: free
+    autoDeploy: false
+
+envVarGroups:
+  - name: koi-env
+    envVars:
+      - key: GITHUB_TOKEN
+        value: <github-token>
+      - key: HACKMD_TOKEN
+        value: <hackmd-token>
+      - key: GITHUB_WEBHOOK_SECRET
+        value: <github-webhook-secret>
+      - key: RID_CACHE_DIR
+        value: /data/cache
+      - key: SUBNET_ID
+        value: demo-subnet
+      - key: RUN_CONTEXT
+        value: docker
+      - key: KOI_CONFIG_MODE
+        value: docker
