@@ -5,17 +5,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
 
 # Copy code and shared dependencies
-COPY ./rid_types /app/rid_types
 COPY . /app/
 
 # Install curl
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Install shared rid_types
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system -e /app/rid_types
-
-ENV PYTHONPATH="/app/rid_types:${PYTHONPATH}"
 
 # Install processor B itself
 RUN --mount=type=cache,target=/root/.cache/uv \
