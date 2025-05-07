@@ -1,0 +1,17 @@
+edges:
+  coordinator_url: http://coordinator:8080/koi-net
+runtime:
+  base_url: http://github-sensor:8001/koi-net
+  cache_dir: ${RID_CACHE_DIR}
+  host: 0.0.0.0
+  log_level: INFO
+  port: 8001
+  state_file: ${RID_CACHE_DIR}/github_state.json
+sensor:
+  kind: github
+  mode: webhook
+  poll_interval: 60
+  repos:
+    - sayertindall/koi-demo
+webhook:
+  secret_env_var: GITHUB_WEBHOOK_SECRET

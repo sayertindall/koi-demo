@@ -1,0 +1,13 @@
+# Processor A Config (Docker)
+runtime:
+  base_url: http://processor-a:8011/koi-net
+  cache_dir: ${RID_CACHE_DIR} # Shared cache volume
+  host: 0.0.0.0
+  log_level: INFO
+  port: 8011
+
+edges:
+  coordinator_url: http://coordinator:8080/koi-net
+# Optional: Specify exact sensor if discovery is problematic
+# processor_a:
+#   github_sensor_rid: "orn:koi.node:<uuid_of_github_sensor>"
