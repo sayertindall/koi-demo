@@ -4,6 +4,8 @@ kill_timeout = 5
 
 [build]
   dockerfile = "Dockerfile"
+  [build.args]
+    SERVICE_NAME = "hackmd-sensor"
 
 [env]
   RUN_CONTEXT     = "docker"
