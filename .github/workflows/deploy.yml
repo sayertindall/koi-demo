@@ -13,9 +13,8 @@ jobs:
 
       - name: Copy config and env for coordinator
         run: |
-          cp ../../config/docker/coordinator.yaml config.yaml
-          cp ../../config/docker/global.env global.env
-        working-directory: nodes/koi-net-coordinator-node
+          cp config/docker/coordinator.yaml nodes/koi-net-coordinator-node/config.yaml
+          cp config/docker/global.env nodes/koi-net-coordinator-node/global.env
 
       - name: Deploy coordinator
         working-directory: nodes/koi-net-coordinator-node
@@ -25,9 +24,8 @@ jobs:
 
       - name: Copy config and env for github sensor
         run: |
-          cp ../../config/docker/github-sensor.yaml config.yaml
-          cp ../../config/docker/global.env global.env
-        working-directory: nodes/koi-net-github-sensor-node
+          cp config/docker/github-sensor.yaml nodes/koi-net-github-sensor-node/config.yaml
+          cp config/docker/global.env nodes/koi-net-github-sensor-node/global.env
 
       - name: Deploy github sensor
         working-directory: nodes/koi-net-github-sensor-node
@@ -37,9 +35,8 @@ jobs:
 
       - name: Copy config and env for hackmd sensor
         run: |
-          cp ../../config/docker/hackmd-sensor.yaml config.yaml
-          cp ../../config/docker/global.env global.env
-        working-directory: nodes/koi-net-hackmd-sensor-node
+          cp config/docker/hackmd-sensor.yaml nodes/koi-net-hackmd-sensor-node/config.yaml
+          cp config/docker/global.env nodes/koi-net-hackmd-sensor-node/global.env
 
       - name: Deploy hackmd sensor
         working-directory: nodes/koi-net-hackmd-sensor-node
@@ -49,9 +46,8 @@ jobs:
 
       - name: Copy config and env for processor a
         run: |
-          cp ../../config/docker/processor-a.yaml config.yaml
-          cp ../../config/docker/global.env global.env
-        working-directory: nodes/koi-net-processor-a-node
+          cp config/docker/processor-a.yaml nodes/koi-net-processor-a-node/config.yaml
+          cp config/docker/global.env nodes/koi-net-processor-a-node/global.env
 
       - name: Deploy processor a
         working-directory: nodes/koi-net-processor-a-node
@@ -61,9 +57,8 @@ jobs:
 
       - name: Copy config and env for processor b
         run: |
-          cp ../../config/docker/processor-b.yaml config.yaml
-          cp ../../config/docker/global.env global.env
-        working-directory: nodes/koi-net-processor-b-node
+          cp config/docker/processor-b.yaml nodes/koi-net-processor-b-node/config.yaml
+          cp config/docker/global.env nodes/koi-net-processor-b-node/global.env
 
       - name: Deploy processor b
         working-directory: nodes/koi-net-processor-b-node
