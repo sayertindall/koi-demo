@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 # --- Config Loader: Supports config/local and config/docker ---
 CONFIG_MODE = os.environ.get("KOI_CONFIG_MODE", "local")
 if os.environ.get("RUN_CONTEXT") == "docker":
-    CONFIG_PATH = Path("/config/config.yaml")
-    ENV_PATH = Path("/config/global.env")
+    CONFIG_PATH = Path("/app/config/config.yaml")
+    ENV_PATH = Path("/app/config/global.env")
     if CONFIG_MODE != "docker":
         logger.warning(
             f"RUN_CONTEXT=docker but KOI_CONFIG_MODE='{CONFIG_MODE}'. Forcing KOI_CONFIG_MODE to 'docker'."
@@ -26,8 +26,6 @@ else:
     CONFIG_PATH = CONFIG_DIR / "processor-a.yaml"
     ENV_PATH = CONFIG_DIR / "global.env"
 
-logger.info(f"Attempting to load config from: {CONFIG_PATH}")
-logger.info(f"Attempting to load env from: {ENV_PATH}")
 
 # Load env vars from the selected global.env first
 if ENV_PATH.is_file():
