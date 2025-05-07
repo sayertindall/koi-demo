@@ -19,8 +19,7 @@ else:
     CONFIG_PATH = CONFIG_DIR / "coordinator.yaml"
     ENV_PATH = CONFIG_DIR / "global.env"
 
-print(f"CONFIG_DIR: {CONFIG_DIR}")
-print(f"CONFIG_MODE: {CONFIG_MODE}")
+
 
 # Load env vars from the selected global.env
 if ENV_PATH.is_file():
