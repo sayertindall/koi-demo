@@ -1,9 +1,0 @@
-runtime:
-  base_url: http://koi-processor-b.onrender.com/koi-net
-  cache_dir: ${RID_CACHE_DIR}
-  host: 0.0.0.0
-  log_level: INFO
-  port: 8012
-
-edges:
-  coordinator_url: http://koi-coordinator.onrender.com/koi-net
