@@ -9,7 +9,7 @@ from koi_net.protocol.event import EventType
 from koi_net.protocol.edge import EdgeType
 from koi_net.protocol.helpers import generate_edge_bundle
 from rid_lib.types import KoiNetNode, KoiNetEdge
-from rid_types.hackmd import HackMDNote
+from .rid_types import HackMDNote
 
 # Import config to potentially check for specific sensor RID
 from .config import HACKMD_SENSOR_RID

@@ -1,6 +1,6 @@
 .PHONY: setup install clean coordinator github hackmd processor-a processor-b \
         demo-coordinator demo-github demo-hackmd docker-clean rebuild \
-        docker-rebuild clean-cache up down vendor-shared
+        docker-rebuild clean-cache up down
 
 setup:
 	@echo "Creating virtual environment with uv..."
@@ -17,8 +17,6 @@ install:
 	uv pip install -e nodes/koi-net-github-sensor-node/
 	@echo "Installing hackmd service..."
 	uv pip install -e nodes/koi-net-hackmd-sensor-node/
-	@echo "Installing rid_types package..."
-	uv pip install -e rid_types/
 	@echo "Installing processor-a-node..."
 	uv pip install -e nodes/koi-net-processor-a-node/
 	@echo "Installing processor-b-node..."
@@ -96,9 +94,3 @@ up:
 down:
 	@echo "Stopping Docker services..."
 	docker compose down
-
-vendor-shared:
-	@echo "Vendoring rid_types to all nodes..."
-	@for dir in nodes/koi-net-*; do \
-	  rm -rf $$dir/rid_types && cp -r rid_types $$dir/; \
-	done
