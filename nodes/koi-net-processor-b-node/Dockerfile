@@ -6,8 +6,9 @@ WORKDIR /app
 
 # Copy code and shared dependencies
 COPY . .
-COPY ../../config/docker/global.env /config/global.env
-COPY ../../config/docker/${SERVICE_NAME}.yaml /config/config.yaml
+# Config files will be copied by CI/CD
+# COPY ../../config/docker/global.env /config/global.env
+# COPY ../../config/docker/${SERVICE_NAME}.yaml /config/config.yaml
 
 # Install curl
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*

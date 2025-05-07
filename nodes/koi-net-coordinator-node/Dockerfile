@@ -3,8 +3,9 @@ FROM python:3.12-slim
 ARG SERVICE_NAME
 WORKDIR /app
 COPY . .
-COPY ../../config/docker/global.env /config/global.env
-COPY ../../config/docker/${SERVICE_NAME}.yaml /config/config.yaml
+# Config files will be copied by CI/CD
+# COPY ../../config/docker/global.env /config/global.env
+# COPY ../../config/docker/${SERVICE_NAME}.yaml /config/config.yaml
 
 # 1) copy UV package manager
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/

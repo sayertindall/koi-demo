@@ -6,8 +6,9 @@ WORKDIR /app
 
 # Copy all project files first
 COPY . .
-COPY ../../config/docker/global.env /config/global.env
-COPY ../../config/docker/${SERVICE_NAME}.yaml /config/config.yaml
+# Config files will be copied by CI/CD
+# COPY ../../config/docker/global.env /config/global.env
+# COPY ../../config/docker/${SERVICE_NAME}.yaml /config/config.yaml
 
 # Install curl for healthcheck
 RUN apt-get update && apt-get install -y curl

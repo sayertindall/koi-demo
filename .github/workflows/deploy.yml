@@ -47,10 +47,13 @@ jobs:
           # Log that the file was created (without showing content for security)
           echo "global.env created successfully"
 
-      - name: Copy config and env for coordinator
+      - name: Prepare coordinator node
         run: |
-          cp config/docker/coordinator.yaml nodes/koi-net-coordinator-node/config.yaml
-          cp config/docker/global.env nodes/koi-net-coordinator-node/global.env
+          # Create config directory
+          mkdir -p nodes/koi-net-coordinator-node/config
+          # Copy config files to their expected locations
+          cp config/docker/coordinator.yaml nodes/koi-net-coordinator-node/config/config.yaml
+          cp config/docker/global.env nodes/koi-net-coordinator-node/config/global.env
 
       - name: Deploy coordinator
         working-directory: nodes/koi-net-coordinator-node
@@ -58,10 +61,13 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only
 
-      - name: Copy config and env for github sensor
+      - name: Prepare github sensor node
         run: |
-          cp config/docker/github-sensor.yaml nodes/koi-net-github-sensor-node/config.yaml
-          cp config/docker/global.env nodes/koi-net-github-sensor-node/global.env
+          # Create config directory
+          mkdir -p nodes/koi-net-github-sensor-node/config
+          # Copy config files to their expected locations
+          cp config/docker/github-sensor.yaml nodes/koi-net-github-sensor-node/config/config.yaml
+          cp config/docker/global.env nodes/koi-net-github-sensor-node/config/global.env
 
       - name: Deploy github sensor
         working-directory: nodes/koi-net-github-sensor-node
@@ -69,10 +75,13 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only
 
-      - name: Copy config and env for hackmd sensor
+      - name: Prepare hackmd sensor node
         run: |
-          cp config/docker/hackmd-sensor.yaml nodes/koi-net-hackmd-sensor-node/config.yaml
-          cp config/docker/global.env nodes/koi-net-hackmd-sensor-node/global.env
+          # Create config directory
+          mkdir -p nodes/koi-net-hackmd-sensor-node/config
+          # Copy config files to their expected locations
+          cp config/docker/hackmd-sensor.yaml nodes/koi-net-hackmd-sensor-node/config/config.yaml
+          cp config/docker/global.env nodes/koi-net-hackmd-sensor-node/config/global.env
 
       - name: Deploy hackmd sensor
         working-directory: nodes/koi-net-hackmd-sensor-node
@@ -80,10 +89,13 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only
 
-      - name: Copy config and env for processor a
+      - name: Prepare processor a node
         run: |
-          cp config/docker/processor-a.yaml nodes/koi-net-processor-a-node/config.yaml
-          cp config/docker/global.env nodes/koi-net-processor-a-node/global.env
+          # Create config directory
+          mkdir -p nodes/koi-net-processor-a-node/config
+          # Copy config files to their expected locations
+          cp config/docker/processor-a.yaml nodes/koi-net-processor-a-node/config/config.yaml
+          cp config/docker/global.env nodes/koi-net-processor-a-node/config/global.env
 
       - name: Deploy processor a
         working-directory: nodes/koi-net-processor-a-node
@@ -91,10 +103,13 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only
 
-      - name: Copy config and env for processor b
+      - name: Prepare processor b node
         run: |
-          cp config/docker/processor-b.yaml nodes/koi-net-processor-b-node/config.yaml
-          cp config/docker/global.env nodes/koi-net-processor-b-node/global.env
+          # Create config directory
+          mkdir -p nodes/koi-net-processor-b-node/config
+          # Copy config files to their expected locations
+          cp config/docker/processor-b.yaml nodes/koi-net-processor-b-node/config/config.yaml
+          cp config/docker/global.env nodes/koi-net-processor-b-node/config/global.env
 
       - name: Deploy processor b
         working-directory: nodes/koi-net-processor-b-node
