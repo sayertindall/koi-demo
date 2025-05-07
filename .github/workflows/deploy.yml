@@ -9,7 +9,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+        with:
+          fetch-depth: 0 # Ensures all history is fetched
+          lfs: true # Include LFS objects if you use Git LFS
+
+      - name: Verify config files and permissions
+        run: |
+          echo "Verifying config files exist:"
+          ls -la config/docker/
+          echo "Setting proper permissions:"
+          chmod -R 755 config/docker/
 
       - name: Copy config and env for coordinator
         run: |
