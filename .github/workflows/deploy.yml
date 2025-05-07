@@ -11,11 +11,23 @@ jobs:
       - uses: actions/checkout@v3
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
+      - name: Copy config and env for coordinator
+        run: |
+          cp ../../config/docker/coordinator.yaml config.yaml
+          cp ../../config/docker/global.env global.env
+        working-directory: nodes/koi-net-coordinator-node
+
       - name: Deploy coordinator
         working-directory: nodes/koi-net-coordinator-node
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only
+
+      - name: Copy config and env for github sensor
+        run: |
+          cp ../../config/docker/github-sensor.yaml config.yaml
+          cp ../../config/docker/global.env global.env
+        working-directory: nodes/koi-net-github-sensor-node
 
       - name: Deploy github sensor
         working-directory: nodes/koi-net-github-sensor-node
@@ -23,17 +35,35 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only
 
+      - name: Copy config and env for hackmd sensor
+        run: |
+          cp ../../config/docker/hackmd-sensor.yaml config.yaml
+          cp ../../config/docker/global.env global.env
+        working-directory: nodes/koi-net-hackmd-sensor-node
+
       - name: Deploy hackmd sensor
         working-directory: nodes/koi-net-hackmd-sensor-node
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only
 
+      - name: Copy config and env for processor a
+        run: |
+          cp ../../config/docker/processor-a.yaml config.yaml
+          cp ../../config/docker/global.env global.env
+        working-directory: nodes/koi-net-processor-a-node
+
       - name: Deploy processor a
         working-directory: nodes/koi-net-processor-a-node
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: flyctl deploy --remote-only
+
+      - name: Copy config and env for processor b
+        run: |
+          cp ../../config/docker/processor-b.yaml config.yaml
+          cp ../../config/docker/global.env global.env
+        working-directory: nodes/koi-net-processor-b-node
 
       - name: Deploy processor b
         working-directory: nodes/koi-net-processor-b-node
