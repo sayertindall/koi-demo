@@ -13,12 +13,39 @@ jobs:
           fetch-depth: 0 # Ensures all history is fetched
           lfs: true # Include LFS objects if you use Git LFS
 
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
       - name: Verify config files and permissions
         run: |
           echo "Verifying config files exist:"
           ls -la config/docker/
           echo "Setting proper permissions:"
           chmod -R 755 config/docker/
+
+      - name: Create global.env with secrets
+        run: |
+          echo "Creating global.env with secrets:"
+          # Start with the example file as a base (for structure)
+          cp config/docker/global.env.example config/docker/global.env
+
+          # Now replace or add environment variables from GitHub secrets
+          cat > config/docker/global.env << EOL
+          # This file is generated during CI/CD deployment
+          # Environment variables for all nodes
+
+          # Runtime configuration
+          RUN_CONTEXT=docker
+          KOI_CONFIG_MODE=docker
+
+          # Add your secrets here
+          RID_CACHE_DIR=/data/cache
+          GITHUB_API_TOKEN=${{ secrets.GH_API_TOKEN }}
+          HACKMD_API_TOKEN=${{ secrets.HACKMD_TOKEN }}
+          GITHUB_WEBHOOK_SECRET=${{ secrets.GH_WEBHOOK_SECRET }}
+          EOL
+
+          # Log that the file was created (without showing content for security)
+          echo "global.env created successfully"
 
       - name: Copy config and env for coordinator
         run: |
