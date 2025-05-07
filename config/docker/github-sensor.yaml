@@ -1,7 +1,7 @@
 edges:
-  coordinator_url: http://coordinator:8080/koi-net
+  coordinator_url: http://koi-demo-coordinator.internal:8080/koi-net
 runtime:
-  base_url: http://github-sensor:8001/koi-net
+  base_url: http://koi-demo-gh-sensor.internal:8001/koi-net
   cache_dir: ${RID_CACHE_DIR}
   host: 0.0.0.0
   log_level: INFO

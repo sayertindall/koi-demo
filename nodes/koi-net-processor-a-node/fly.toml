@@ -1,0 +1,22 @@
+app = "koi-demo-processor-a"
+kill_signal = "SIGINT"
+kill_timeout = 5
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  RUN_CONTEXT     = "docker"
+  KOI_CONFIG_MODE = "docker"
+  RID_CACHE_DIR   = "/data/cache"
+
+[[mounts]]
+  source      = "processor_a_state_data"
+  destination = "/app/.koi/processor_a"
+
+[[services]]
+  internal_port = 8011
+  protocol      = "tcp"
+  [[services.ports]]
+    handlers = ["http"]
+    port     = 80 

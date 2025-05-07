@@ -14,13 +14,13 @@ logger = logging.getLogger(__name__)
 # --- Config Loader: Supports config/local and config/docker based on KOI_CONFIG_MODE and RUN_CONTEXT ---
 CONFIG_MODE = os.environ.get("KOI_CONFIG_MODE", "local")
 if os.environ.get("RUN_CONTEXT") == "docker":
-    CONFIG_BASE = Path("/config")
+    CONFIG_PATH = Path("/config/config.yaml")
+    ENV_PATH = Path("/config/global.env")
 else:
     CONFIG_BASE = Path(__file__).parent.parent.parent.parent / "config"
-CONFIG_DIR = CONFIG_BASE / CONFIG_MODE
-
-CONFIG_PATH = CONFIG_DIR / "github-sensor.yaml"
-ENV_PATH = CONFIG_DIR / "global.env"
+    CONFIG_DIR = CONFIG_BASE / CONFIG_MODE
+    CONFIG_PATH = CONFIG_DIR / "github-sensor.yaml"
+    ENV_PATH = CONFIG_DIR / "global.env"
 
 # Load env vars from the selected global.env
 if ENV_PATH.is_file():

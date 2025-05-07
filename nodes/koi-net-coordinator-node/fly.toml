@@ -1,0 +1,22 @@
+app = "koi-demo-coordinator"
+kill_signal = "SIGINT"
+kill_timeout = 5
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  RUN_CONTEXT     = "docker"
+  KOI_CONFIG_MODE = "docker"
+  RID_CACHE_DIR   = "/data/cache"
+
+[[mounts]]
+  source      = "coordinator_state_data"
+  destination = "/app/.koi/coordinator"
+
+[[services]]
+  internal_port = 8080
+  protocol      = "tcp"
+  [[services.ports]]
+    handlers = ["http"]
+    port     = 80 

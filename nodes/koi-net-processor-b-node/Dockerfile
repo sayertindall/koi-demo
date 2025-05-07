@@ -5,7 +5,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
 
 # Copy code and shared dependencies
-COPY . /app/
+COPY . .
+COPY ../../config/docker/global.env /config/global.env
+COPY ../../config/docker/${SERVICE_NAME}.yaml /config/config.yaml
 
 # Install curl
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*

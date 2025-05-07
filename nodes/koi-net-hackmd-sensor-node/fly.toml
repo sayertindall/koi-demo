@@ -1,0 +1,22 @@
+app = "koi-demo-hackmd-sensor"
+kill_signal = "SIGINT"
+kill_timeout = 5
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  RUN_CONTEXT     = "docker"
+  KOI_CONFIG_MODE = "docker"
+  RID_CACHE_DIR   = "/data/cache"
+
+[[mounts]]
+  source      = "hackmd_sensor_state_data"
+  destination = "/app/.koi/hackmd_sensor"
+
+[[services]]
+  internal_port = 8002
+  protocol      = "tcp"
+  [[services.ports]]
+    handlers = ["http"]
+    port     = 80 

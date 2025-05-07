@@ -1,0 +1,53 @@
+name: CI/CD → Fly.io
+
+on:
+  push:
+    branches: [deploy]
+
+jobs:
+  filter:
+    runs-on: ubuntu-latest
+    outputs:
+      coordinator: ${{ steps.paths.outputs.coordinator }}
+      github_sensor: ${{ steps.paths.outputs.github_sensor }}
+      hackmd_sensor: ${{ steps.paths.outputs.hackmd_sensor }}
+      processor_a: ${{ steps.paths.outputs.processor_a }}
+      processor_b: ${{ steps.paths.outputs.processor_b }}
+    steps:
+      - uses: actions/checkout@v3
+      - id: paths
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            coordinator:
+              - "nodes/koi-net-coordinator-node/**"
+              - "config/docker/coordinator.yaml"
+            github_sensor:
+              - "nodes/koi-net-github-sensor-node/**"
+              - "config/docker/github-sensor.yaml"
+            hackmd_sensor:
+              - "nodes/koi-net-hackmd-sensor-node/**"
+              - "config/docker/hackmd-sensor.yaml"
+            processor_a:
+              - "nodes/koi-net-processor-a-node/**"
+              - "config/docker/processor-a.yaml"
+            processor_b:
+              - "nodes/koi-net-processor-b-node/**"
+              - "config/docker/processor-b.yaml"
+
+  deploy:
+    needs: filter
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          [coordinator, github_sensor, hackmd_sensor, processor_a, processor_b]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy ${{ matrix.service }}
+        if: ${{ needs.filter.outputs[matrix.service] == 'true' }}
+        working-directory: nodes/koi-net-${{ matrix.service }}-node
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only
